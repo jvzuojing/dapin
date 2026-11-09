@@ -284,6 +284,10 @@ export interface AccessLoginNumVO {
  * ------------------------------------------------------------------ */
 
 export interface RegionNode {
+  /**
+   * 区划代码。getRegionTree 返回体 data 顶层的 regionCode 是「已选择区划」，
+   * 首屏后续所有数据接口都必须以它作为 regionCode 入参。
+   */
   regionCode: string
   regionName: string
   parentCode: string

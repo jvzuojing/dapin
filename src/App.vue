@@ -81,7 +81,7 @@ import RightPanel from './components/RightPanel.vue'
 import { useDashboardApi } from './composables/useDashboardApi'
 import { apiConfig } from './config/api'
 
-const { regionCascaderOptions, getRegionPath, initRegionTree, loadRegionData, loadGlobalData, loadAll, refreshAll } = useDashboardApi()
+const { regionCascaderOptions, getRegionPath, initRegionTree, loadRegionData, loadGlobalData, loadAll, refreshAll, defaultRegionCode } = useDashboardApi()
 
 // 是否走真实接口（可在 config/api.ts 或 localStorage 中切换）
 const useApi = apiConfig.useApi
@@ -166,13 +166,15 @@ const wrapperStyle = computed(() => ({
 /** 当前生效的区划代码，用于判断是否真的发生了切换 */
 let activeCode = ''
 let activePath: string[] = []
+/** 首屏初始化期间屏蔽 watch，避免与 bootstrap 的 loadAll 并发发请求 */
+let bootstrapping = true
 const pageLoading = ref(false)
 
 const lastCode = (value: string[]) => value[value.length - 1] ?? ''
 
 /** 区划切换 → 重新加载与区划相关的数据；无权限则回退 */
 watch(selectedRegion, async (value) => {
-  if (!useApi) return
+  if (!useApi || bootstrapping) return
   const code = lastCode(value)
   if (!code || code === activeCode) return
   const prev = activeCode
@@ -199,28 +201,37 @@ watch(selectedRegion, async (value) => {
   }
 })
 
-/** 首次进入：拉取区划树并加载数据 */
+/**
+ * 首次进入，顺序固定：
+ * 1) 先调 getRegionTree（不传 regionCode），返回体里的 regionCode 就是已选择区划；
+ * 2) 用这个 code 设置下拉选中项与 activeCode；
+ * 3) 最后才发其余所有数据接口，且每个都带这个 code。
+ */
 async function bootstrap() {
   if (!useApi) {
     selectedRegion.value = ['neimenggu', 'huhehaote', 'xincheng']
     activeCode = lastCode(selectedRegion.value)
     activePath = [...selectedRegion.value]
+    bootstrapping = false
     return
   }
   pageLoading.value = true
   try {
     const path = await initRegionTree()
-    if (!path.length) {
+    // 以接口返回的已选择区划为准，不再用区划树根节点自己推导
+    const code = defaultRegionCode.value || path[path.length - 1] || ''
+    if (!code) {
       ElMessage.warning('未获取到区划数据')
       return
     }
-    activeCode = path[path.length - 1]
-    activePath = [...path]
-    selectedRegion.value = path
-    await loadAll(activeCode)
+    activeCode = code
+    activePath = path.length ? [...path.slice(0, -1), code] : [code]
+    selectedRegion.value = activePath
+    await loadAll(code)
   } catch {
     // initRegionTree 内部已统一弹错
   } finally {
+    bootstrapping = false
     pageLoading.value = false
   }
 }

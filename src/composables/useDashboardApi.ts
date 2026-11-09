@@ -37,8 +37,30 @@ export interface RegionCascaderOption {
  * ------------------------------------------------------------------ */
 
 const regionCode = ref('')
+/**
+ * getRegionTree 返回体 data.regionCode：当前登录用户「已选择」的区划。
+ * 首屏所有数据接口都必须带这个值；也是「返回全区」与地图覆盖率的基准区划。
+ */
+const defaultRegionCode = ref('')
+const regionReady = ref(false)
 const regionRoot = ref<RegionNode | null>(null)
 const regionCascaderOptions = ref<RegionCascaderOption[]>([])
+
+/**
+ * 区划就绪闸门：子组件 onMounted 早于 App.bootstrap 完成，
+ * 这里让所有数据接口先等 getRegionTree 返回，避免带着空 regionCode 发出去。
+ * 放行后请求会自动继续，不需要各组件改调用时机。
+ */
+let resolveRegionReady: () => void = () => {}
+const regionReadyPromise = new Promise<void>((resolve) => {
+  resolveRegionReady = resolve
+})
+
+/** 等待首屏区划确定；返回应传给所有数据接口的区划码，取不到时为空串 */
+async function waitForRegionCode(): Promise<string> {
+  await regionReadyPromise
+  return regionCode.value
+}
 
 const userSituation = ref<UserSituationVO | null>(null)
 /**
@@ -151,15 +173,30 @@ function mergeAccessList(
  * ------------------------------------------------------------------ */
 
 /**
- * 初始化区划树（一次拉全树，默认到旗县区级）
- * @returns 默认选中的区划路径（根节点）
+ * 首次初始化区划（必须最先调用）
+ *
+ * getRegionTree 不传 regionCode，后端按登录用户返回区划树；
+ * 返回体 data 顶层的 regionCode 就是「已选择区划」，先写入单例 regionCode，
+ * 再放行数据接口，保证后续每一个请求都带着这个值。
+ *
+ * @returns 默认选中的区划路径（末项即 data.regionCode）
  */
 export async function initRegionTree(): Promise<string[]> {
-  const rawRoot = await dashboardApi.getRegionTree()
-  const root = rawRoot ? trimRegionTree(rawRoot, Math.max(1, 5 - getNodeGrade(rawRoot))) : null
-  regionRoot.value = root
-  regionCascaderOptions.value = root ? [toCascaderOption(root)] : []
-  return root ? findRegionPath(root, root.regionCode) : []
+  try {
+    const rawRoot = await dashboardApi.getRegionTree()
+    const code = rawRoot?.regionCode ?? ''
+    defaultRegionCode.value = code
+    regionCode.value = code
+    const root = rawRoot ? trimRegionTree(rawRoot, Math.max(1, 5 - getNodeGrade(rawRoot))) : null
+    regionRoot.value = root
+    regionCascaderOptions.value = root ? [toCascaderOption(root)] : []
+    const path = code ? findRegionPath(root, code) : []
+    return path.length ? path : code ? [code] : []
+  } finally {
+    // 成功或失败都放行：失败时 regionCode 为空，数据接口会跳过，不会发空参数请求
+    regionReady.value = true
+    resolveRegionReady()
+  }
 }
 
 /* ------------------------------------------------------------------ *
@@ -170,21 +207,23 @@ export async function initRegionTree(): Promise<string[]> {
  * 加载与区划相关的数据
  * @returns 是否具备该区划权限（false 时调用方应回退区划选择）
  */
-export async function loadRegionData(code: string): Promise<boolean> {
-  regionCode.value = code
+export async function loadRegionData(code?: string): Promise<boolean> {
+  const effective = code || (await waitForRegionCode())
+  if (!effective) return true
+  regionCode.value = effective
   // 区划变了，地区/部门使用情况需按新区划重新点击加载
   accessRegionList.value = null
   accessDeptList.value = null
   regionDataLoading.value = true
   try {
     const results = await Promise.allSettled([
-      dashboardApi.getUserSituation(code),
-      dashboardApi.getDataFillRate(code),
-      dashboardApi.getDaPingBasicDataOverview(code),
-      dashboardApi.getDeptUserCount(1, 6, code),
+      dashboardApi.getUserSituation(effective),
+      dashboardApi.getDataFillRate(effective),
+      dashboardApi.getDaPingBasicDataOverview(effective),
+      dashboardApi.getDeptUserCount(1, 6, effective),
       // 自治区报表 / 基层精简保留清单：同一接口按 isExtended 取两份
-      dashboardApi.getFillCount(code, false),
-      dashboardApi.getFillCount(code, true)
+      dashboardApi.getFillCount(effective, false),
+      dashboardApi.getFillCount(effective, true)
     ])
 
     userSituation.value = settledValue(results[0] as PromiseSettledResult<UserSituationVO>)
@@ -198,7 +237,7 @@ export async function loadRegionData(code: string): Promise<boolean> {
 
     // 自治区层只刷新并缓存全区 12 盟市覆盖率；下钻层另存一份供旗县区着色
     const situation = userSituation.value
-    const isRoot = code === regionRoot.value?.regionCode
+    const isRoot = effective === defaultRegionCode.value
     if (isRoot) {
       if (situation?.regionalBarStatsVOList?.length) {
         regionCoverage.value = situation.regionalBarStatsVOList
@@ -219,15 +258,16 @@ export async function loadRegionData(code: string): Promise<boolean> {
  * 全局数据（按当前选中区划 regionCode 过滤）
  * ------------------------------------------------------------------ */
 
-/** 加载报表统计、系统使用趋势等数据（带当前区划 regionCode） */
-export async function loadGlobalData(): Promise<void> {
-  const code = regionCode.value
+/** 加载报表统计、系统使用趋势等数据（带当前生效区划 regionCode） */
+export async function loadGlobalData(code?: string): Promise<void> {
+  const effective = code || (await waitForRegionCode())
+  if (!effective) return
   globalDataLoading.value = true
   try {
     const results = await Promise.allSettled([
-      dashboardApi.getReportStats('country', code),
-      dashboardApi.getAccessTrend(code),
-      dashboardApi.getAccessLoginNum(code)
+      dashboardApi.getReportStats('country', effective),
+      dashboardApi.getAccessTrend(effective),
+      dashboardApi.getAccessLoginNum(effective)
     ])
 
     reportStats.value = settledValue(results[0] as PromiseSettledResult<ReportStatsVO>)
@@ -240,8 +280,10 @@ export async function loadGlobalData(): Promise<void> {
 
 /** 拉取单路使用情况并写入对应缓存 */
 async function fetchAccessInto(type: 'region' | 'dept'): Promise<void> {
+  const code = await waitForRegionCode()
+  if (!code) return
   try {
-    const res = await dashboardApi.getAccessList(accessTimeType.value, type, regionCode.value)
+    const res = await dashboardApi.getAccessList(accessTimeType.value, type, code)
     if (type === 'region') accessRegionList.value = res
     else accessDeptList.value = res
   } catch {
@@ -276,23 +318,27 @@ export async function setAccessTimeType(timeType: string): Promise<void> {
   }
 }
 
-/** 首次加载 */
-export async function loadAll(code: string): Promise<void> {
-  await Promise.allSettled([loadRegionData(code), loadGlobalData()])
+/** 首次加载：显式传入 getRegionTree 返回的已选区划，两个批次都用它 */
+export async function loadAll(code?: string): Promise<void> {
+  const effective = code || (await waitForRegionCode())
+  if (!effective) return
+  await Promise.allSettled([loadRegionData(effective), loadGlobalData(effective)])
 }
 
 /** 手动刷新：重拉当前区划的全部数据 */
 export async function refreshAll(): Promise<void> {
-  await loadAll(regionCode.value)
+  const code = await waitForRegionCode()
+  if (!code) return
+  await loadAll(code)
   // 当前不在自治区层时，地图覆盖率数据不会被 loadRegionData 刷新，单独补一次
-  if (regionCode.value && regionCode.value !== regionRoot.value?.regionCode) {
+  if (code !== defaultRegionCode.value) {
     await loadRegionCoverage()
   }
 }
 
-/** 单独刷新地图覆盖率数据（按根区划取全区 12 盟市） */
+/** 单独刷新地图覆盖率数据（按 getRegionTree 返回的默认区划取全区 12 盟市） */
 export async function loadRegionCoverage(): Promise<void> {
-  const rootCode = regionRoot.value?.regionCode
+  const rootCode = defaultRegionCode.value || regionRoot.value?.regionCode
   if (!rootCode) return
   try {
     const res = await dashboardApi.getUserSituation(rootCode)
@@ -309,31 +355,37 @@ export async function loadRegionCoverage(): Promise<void> {
  * ------------------------------------------------------------------ */
 
 /** 用户部门分布统计（分页） */
-export function fetchDeptUserPage(
+export async function fetchDeptUserPage(
   pageNum: number,
   pageSize: number
 ): Promise<PageResult<DeptUserEntity> | null> {
+  const code = await waitForRegionCode()
+  if (!code) return null
   return dashboardApi
-    .getDeptUserCount(pageNum, pageSize, regionCode.value)
+    .getDeptUserCount(pageNum, pageSize, code)
     .then((res) => res ?? null)
     .catch(() => null)
 }
 
 /** 国家报表列表（接口无分页，返回全量） */
-export function fetchReportList(): Promise<NationalReportVO[]> {
+export async function fetchReportList(): Promise<NationalReportVO[]> {
+  const code = await waitForRegionCode()
+  if (!code) return []
   return dashboardApi
-    .getReportListStats(regionCode.value)
+    .getReportListStats(code)
     .then((res) => res ?? [])
     .catch(() => [] as NationalReportVO[])
 }
 
 /** 国家任务列表（分页） */
-export function fetchTaskPage(
+export async function fetchTaskPage(
   pageNum: number,
   pageSize: number
 ): Promise<PageResult<TaskMonitorDTO> | null> {
+  const code = await waitForRegionCode()
+  if (!code) return null
   return dashboardApi
-    .getNationalTaskList(pageNum, pageSize, 'country', regionCode.value)
+    .getNationalTaskList(pageNum, pageSize, 'country', code)
     .then((res) => res ?? null)
     .catch(() => null)
 }
@@ -346,6 +398,9 @@ export function useDashboardApi() {
   return {
     // 区划
     regionCode,
+    /** getRegionTree 返回的已选择区划（首屏所有接口的 regionCode 真值） */
+    defaultRegionCode,
+    regionReady,
     regionRoot,
     regionCascaderOptions,
     getRegionPath: (code: string) => findRegionPath(regionRoot.value, code),

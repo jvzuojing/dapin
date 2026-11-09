@@ -79,9 +79,13 @@ export function getAccessLoginNum(regionCode?: string) {
   return post<AccessLoginNumVO>(apiConfig.paths.accessLoginNum, { regionCode: regionCode ?? '' })
 }
 
-/** 2.10 区划树；不传 regionCode 取当前登录用户区划，无权限返回 302 */
+/**
+ * 2.10 区划树；首次调用不传 regionCode（请求体不带该字段），
+ * 后端按登录用户返回，data 顶层的 regionCode 即「已选择区划」，后续接口都要带它。
+ * 无权限返回 302。
+ */
 export function getRegionTree(regionCode?: string) {
-  return post<RegionNode>(apiConfig.paths.regionTree, { regionCode: regionCode ?? '' })
+  return post<RegionNode>(apiConfig.paths.regionTree, regionCode ? { regionCode } : {})
 }
 
 /** 2.11 基础数据 - 人房企场所概览 */
