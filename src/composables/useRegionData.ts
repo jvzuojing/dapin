@@ -774,9 +774,13 @@ export function useScaledData() {
 
   const buildEntity = (key: string, item: BasicDataItem | undefined, fallback: Record<string, unknown>) => {
     if (!item) {
+      // 兜底数据本身没有地区轴标签，补上按区划层级的地区名，避免柱图下方一片空白
+      const labels = (fallback.axisLabels as string[] | undefined) ?? REGION_AXIS_MAP[regionDepth.value]
       return {
         ...fallback,
-        axisLabels: fallback.axisLabels as string[],
+        axisLabels: labels,
+        governanceTrend: ((fallback.governanceTrend as number[] | undefined) ?? []).slice(0, labels.length),
+        completionRates: ((fallback.completionRates as number[] | undefined) ?? []).slice(0, labels.length),
         typeStats: fallback.typeStats as Array<{ name: string; value: number }>,
         pieGroups: [] as Array<{ title: string; data: Array<{ name: string; value: number }> }>
       }
@@ -876,13 +880,17 @@ export function useScaledData() {
     const trend = pickTrend()
     // 总访问量取 getReportStats 的 totalAccessNum，未返回时回退 accessLoginNum.totalVisits
     const totalAccess = api.reportStats.value?.totalAccessNum
+    const totalText = totalAccess !== null && totalAccess !== undefined
+      ? visits(totalAccess)
+      : visits(api.accessLoginNum.value?.totalVisits)
+    const dailyText = num(api.accessLoginNum.value?.dailyActiveCount)
+    // 接口未返回明细时逐项回退到原有演示序列，保证三个区块不空白；接口恢复后自动用真值
+    const fallbackVisits = baseSysAll.visits.map((v) => Math.round(v * scale.value))
     return {
-      total: totalAccess !== null && totalAccess !== undefined
-        ? visits(totalAccess)
-        : visits(api.accessLoginNum.value?.totalVisits),
-      dailyActive: num(api.accessLoginNum.value?.dailyActiveCount),
-      dates: trend.dates,
-      visits: trend.visits
+      total: !totalText || totalText === EMPTY ? baseSysAll.total : totalText,
+      dailyActive: !dailyText || dailyText === EMPTY ? baseSysAll.dailyActive : dailyText,
+      dates: trend.dates.length ? trend.dates : baseSysAll.dates,
+      visits: trend.visits.length ? trend.visits : fallbackVisits
     }
   })
 
@@ -894,6 +902,12 @@ export function useScaledData() {
       }
     }
     const list = api.accessList.value?.regionInfo ?? []
+    if (!list.length) {
+      return {
+        cities: baseSysCity.cities,
+        visits: baseSysCity.visits.map((v) => Math.round(v * scale.value))
+      }
+    }
     return {
       cities: list.map((item) => pickStr(item as Record<string, unknown>, ['regionName']) || EMPTY),
       visits: list.map((item) => pickNum(item as Record<string, unknown>, [
@@ -910,6 +924,12 @@ export function useScaledData() {
       }
     }
     const list = api.accessList.value?.organInfo ?? []
+    if (!list.length) {
+      return {
+        departments: baseSysDept.departments,
+        visits: baseSysDept.visits.map((v) => Math.round(v * scale.value))
+      }
+    }
     return {
       departments: list.map((item) => pickStr(item as Record<string, unknown>, ['organName', 'deptName', 'name', 'orgName']) || EMPTY),
       visits: list.map((item) => pickNum(item as Record<string, unknown>, [

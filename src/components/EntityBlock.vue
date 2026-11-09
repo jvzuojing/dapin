@@ -7,9 +7,15 @@
       <span v-else class="block-total placeholder"></span>
     </div>
     <div class="block-body">
-      <div ref="trendRef" class="block-chart"></div>
+      <div class="block-main">
+        <div ref="trendRef" class="block-chart"></div>
+        <div class="chart-caption">{{ axisTitle }}</div>
+      </div>
       <div v-if="rightMode !== 'none'" class="block-side">
-        <div v-if="rightMode === 'wordcloud'" ref="cloudRef" class="side-cloud"></div>
+        <div v-if="rightMode === 'wordcloud'" class="side-cloud-item">
+          <div class="donut-title">{{ cloudTitle }}</div>
+          <div ref="cloudRef" class="side-cloud"></div>
+        </div>
         <template v-else>
           <div
             v-for="(g, i) in donuts"
@@ -44,12 +50,18 @@ const props = withDefaults(defineProps<{
   rates: number[]
   cloudWords?: Array<{ name: string; value: number }>
   donuts?: DonutGroup[]
+  /** 柱状图下方的说明文字：表明这组柱子代表什么数据 */
+  axisTitle?: string
+  /** 词云上方的小标题 */
+  cloudTitle?: string
   /** 数据是否为空（空则显示占位） */
   empty?: boolean
 }>(), {
   tagTotal: '',
   cloudWords: () => [],
   donuts: () => [],
+  axisTitle: '按地区分布 · 基层治理量',
+  cloudTitle: '主要标签分布情况',
   empty: false
 })
 
@@ -68,31 +80,47 @@ let ro: ResizeObserver | null = null
 
 const PIE_COLORS = ['#40e0ff', '#5dd39e', '#409eff', '#6ab7ff', '#f5a623', '#9b8cff', '#1ed1a8', '#5b8ff9', '#30bf78', '#ffd166']
 
-const truncate = (label: string, max = 4) => (label.length > max ? `${label.slice(0, max)}...` : label)
+/** 地区名缩写：去掉行政后缀，最多 3 个字符，超出用省略号；悬停仍显示全称 */
+const shortAxisLabel = (label: string) => {
+  const name = label.replace(/(自治旗|自治县|自治盟|市|盟|旗|县|区)$/u, '')
+  const base = name || label
+  return base.length > 3 ? `${base.slice(0, 2)}…` : base
+}
 
 const renderTrend = () => {
   if (!trendChart) return
   trendChart.setOption({
-    tooltip: { trigger: 'axis' },
+    tooltip: {
+      trigger: 'axis',
+      formatter: (params: any) => {
+        const p = Array.isArray(params) ? params[0] : params
+        if (!p) return ''
+        return `${p.axisValue}<br/>基层治理量：${p.data}`
+      }
+    },
     legend: {
       data: ['基层治理量'],
-      textStyle: { color: '#7a93c4', fontSize: 11 },
+      textStyle: { color: '#a9c8f5', fontSize: 11 },
       top: 0,
       left: 'center',
       itemWidth: 10,
       itemHeight: 8
     },
-    grid: { top: 26, right: 10, bottom: 22, left: 8, containLabel: true },
+    grid: { top: 26, right: 10, bottom: 38, left: 8, containLabel: true },
     xAxis: {
       type: 'category',
       data: props.axisLabels,
       axisLine: { lineStyle: { color: 'rgba(64,158,255,0.2)' } },
-      axisLabel: { color: '#7a93c4', fontSize: 10, interval: 0, rotate: 26, margin: 5, formatter: (v: string) => truncate(v) }
+      axisTick: { alignWithLabel: true, lineStyle: { color: 'rgba(64,158,255,0.25)' } },
+      axisLabel: {
+        color: '#a9c8f5', fontSize: 10, interval: 1, rotate: 50, margin: 8,
+        formatter: (v: string) => shortAxisLabel(v)
+      }
     },
     yAxis: {
       type: 'value',
       axisLine: { show: false },
-      axisLabel: { color: '#7a93c4', fontSize: 10 },
+      axisLabel: { color: '#9ab9e6', fontSize: 10 },
       splitLine: { lineStyle: { color: 'rgba(64,158,255,0.08)' } }
     },
     series: [{
@@ -249,10 +277,30 @@ defineExpose({ resize: () => {
   gap: 6px;
 }
 
-.block-chart {
+.block-main {
   flex: 1.5 1 0;
   min-width: 0;
   min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.block-chart {
+  flex: 1 1 auto;
+  width: 100%;
+  min-width: 0;
+  min-height: 0;
+}
+
+.chart-caption {
+  flex: 0 0 auto;
+  text-align: center;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 15px;
+  color: #cfe4ff;
+  letter-spacing: 0.5px;
+  padding-bottom: 1px;
 }
 
 .block-side {
@@ -263,7 +311,15 @@ defineExpose({ resize: () => {
   gap: 4px;
 }
 
-.side-cloud { flex: 1; min-width: 0; min-height: 0; }
+.side-cloud-item {
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.side-cloud { flex: 1 1 auto; min-width: 0; min-height: 0; }
 
 .side-donut-item {
   flex: 1 1 0;
@@ -275,8 +331,8 @@ defineExpose({ resize: () => {
 .donut-title {
   flex: 0 0 auto;
   text-align: center;
-  font-size: 11px;
-  color: #8fb3dd;
+  font-size: 12px;
+  color: #bcd9ff;
   padding-top: 2px;
 }
 

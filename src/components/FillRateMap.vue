@@ -1,12 +1,6 @@
 <template>
   <div class="fill-rate-map">
     <div ref="chartRef" class="map-canvas"></div>
-    <div class="map-legend">
-      <span class="legend-text">{{ metricLabel }}</span>
-      <i class="legend-bar"></i>
-      <span class="legend-scale">{{ minText }} ~ {{ maxText }}</span>
-    </div>
-    <div v-if="tip" class="map-tip">{{ tip }}</div>
   </div>
 </template>
 
@@ -43,10 +37,6 @@ const props = withDefaults(
     data: FillRateItem[]
     /** 大屏整体缩放版本号，变化时重新 resize */
     scaleVersion?: number
-    /** 图例指标名 */
-    metricLabel?: string
-    /** 右下角提示文案，空串则不显示 */
-    tip?: string
     /** 当前选中的盟市 6 位区划代码（国标），用于下钻到旗县区 */
     selectedCode?: string
     /** 当前选中的旗县区 6 位区划代码；有值时地图聚焦该旗县区 */
@@ -57,8 +47,6 @@ const props = withDefaults(
   {
     data: () => [],
     scaleVersion: 0,
-    metricLabel: '覆盖率',
-    tip: '',
     selectedCode: '',
     selectedCountyCode: '',
     countyData: () => []
@@ -239,17 +227,6 @@ const validData = computed(() => matchItems(props.data, regionNames, adcodeToNam
 const validCountyData = computed(() =>
   matchItems(props.countyData, countyNames, countyCodeToName, countyNameToCode)
 )
-const legendItems = computed(() =>
-  viewLevel.value === 'region' ? validData.value : validCountyData.value
-)
-const minVal = computed(() =>
-  legendItems.value.length ? Math.min(...legendItems.value.map((d) => Number(d.value))) : 0
-)
-const maxVal = computed(() =>
-  legendItems.value.length ? Math.max(...legendItems.value.map((d) => Number(d.value))) : 100
-)
-const minText = computed(() => `${minVal.value.toFixed(0)}%`)
-const maxText = computed(() => `${maxVal.value.toFixed(0)}%`)
 
 const hex2rgb = (h: string) => [
   parseInt(h.slice(1, 3), 16),
@@ -263,12 +240,21 @@ const lerpColor = (a: string, b: string, t: number) => {
   return `rgb(${Math.round(A[0] + (B[0] - A[0]) * t)},${Math.round(A[1] + (B[1] - A[1]) * t)},${Math.round(A[2] + (B[2] - A[2]) * t)})`
 }
 
-/** 低 → 高：深蓝 → 中蓝 → 亮青 */
-const colorOf = (t: number) => (
-  t < 0.5
-    ? lerpColor('#0a2a52', '#1176a8', t / 0.5)
-    : lerpColor('#1176a8', '#22c8ff', (t - 0.5) / 0.5)
-)
+/** 多段线性插值，避免两段渐变在低值区发闷、高值区过曝 */
+const stopsColor = (stops: string[], t: number) => {
+  const x = Math.min(1, Math.max(0, t)) * (stops.length - 1)
+  const i = Math.min(stops.length - 2, Math.floor(x))
+  return lerpColor(stops[i], stops[i + 1], x - i)
+}
+
+/** 全图唯一色阶（低 → 高）：藏蓝 → 湖蓝 → 青 → 亮青。
+ *  全区与下钻共用这一套，切层级时配色风格不再跳变 */
+const RATE_STOPS = ['#13375f', '#155f96', '#1689bd', '#1bb5d8', '#57e6ff']
+const colorOf = (t: number) => stopsColor(RATE_STOPS, t)
+
+/** 无指标数据时所有面统一用色阶中段的基准色：不再散列着色，也不伪装数值高低；
+ *  相邻块靠细边框、3D 侧面明暗和悬停高亮区分 */
+const BASE_COLOR = colorOf(0.5)
 
 const shortName = (name: string) => name.replace(/(市|盟)$/, '')
 
@@ -287,9 +273,12 @@ const buildOption = () => {
       : validCountyData.value
   const min = items.length ? Math.min(...items.map((d) => Number(d.value))) : 0
   const max = items.length ? Math.max(...items.map((d) => Number(d.value))) : 100
-  const span = Math.max(1, max - min)
-  const norm = (v: number) => Math.min(1, Math.max(0, (v - min) / span))
-
+  // 数据挤在窄区间时给一个最小跨度，避免整张图几乎同色；
+  // 两端各留 6 个百分点余量，让最低/最高值不贴死色阶端点
+  const lo = Math.max(0, min - 6)
+  const hi = Math.min(100, max + 6)
+  const span = Math.max(24, hi - lo)
+  const norm = (v: number) => Math.min(1, Math.max(0, (v - lo) / span))
   // 盟市 / 旗县区视图按外包络盒纵横比调整 boxDepth / 视距，让区域尽量铺满画布
   let boxDepth = 66
   let distance = 74
@@ -303,18 +292,34 @@ const buildOption = () => {
     }
   }
 
-  const regions = items.map((item) => ({
-    name: item.name,
-    height: level === 'region'
-      ? 1.2 + norm(Number(item.value)) * 3.4
-      : level === 'city'
-        ? 1.0 + norm(Number(item.value)) * 2.0
-        : 2.4,
-    itemStyle: {
-      color: colorOf(norm(Number(item.value))),
-      opacity: 0.96
+  const rateByName = new Map(items.map((d) => [d.name, d]))
+  // regions 必须覆盖当前地图上的「每一个面」：否则没匹配到指标的块会回落到
+  // geo3D.itemStyle.color 这一个默认色，且高度是默认值，出现整片死蓝、没有立体厚度
+  const allNames: string[] = level === 'region'
+    ? regionNames
+    : resolved.features
+        .map((f: any) => String(f?.properties?.name ?? ''))
+        .filter(Boolean)
+  const regions = allNames.map((name) => {
+    const hit = rateByName.get(name)
+    // 有指标才用色阶/高度分级；无指标统一基准色 + 统一高度，避免与真实分级混淆
+    const t = hit ? norm(Number(hit.value)) : 0.5
+    const height = hit
+      ? level === 'region'
+        ? 2.0 + t * 4.4
+        : level === 'city'
+          ? 1.8 + t * 2.8
+          : 2.9
+      : 2.6
+    return {
+      name,
+      height,
+      itemStyle: {
+        color: hit ? colorOf(t) : BASE_COLOR,
+        opacity: 0.98
+      }
     }
-  }))
+  })
 
   // 两层必须共用同一份 viewControl，否则拖拽/缩放后事件层会和视觉层错位
   const viewControl = {
@@ -341,23 +346,28 @@ const buildOption = () => {
       shading: 'lambert',
       environment: 'none',
       itemStyle: {
-        color: '#0c3c6d',
-        opacity: 0.95,
-        borderWidth: level === 'region' ? 1.6 : 2,
-        borderColor: 'rgba(140,235,255,.9)'
+        // 兜底底色也提亮；正常渲染时每个面都由 regions 单独着色，不会再落到这个色
+        color: '#124a82',
+        opacity: 0.98,
+        borderWidth: level === 'region' ? 1.1 : 1.4,
+        borderColor: 'rgba(168,238,255,.78)'
       },
       emphasis: {
-        itemStyle: { color: '#3fd6ff' },
-        label: { show: true, color: '#ffffff', fontSize: 14, fontWeight: 600 }
+        itemStyle: {
+          color: '#5ce8ff',
+          borderWidth: 2,
+          borderColor: 'rgba(230,252,255,.95)'
+        },
+        label: { show: true, color: '#ffffff', fontSize: 21, fontWeight: 700 }
       },
       label: {
         show: true,
-        color: '#eaf6ff',
-        fontSize: level === 'county' ? 16 : 11,
+        color: '#eafcff',
+        fontSize: level === 'county' ? 22 : level === 'city' ? 17 : 16,
         fontWeight: 600,
-        distance: 1.2,
-        textBorderColor: '#05203c',
-        textBorderWidth: 2,
+        distance: 1.5,
+        textBorderColor: 'rgba(3,22,48,.9)',
+        textBorderWidth: 3,
         formatter: (p: any) => {
           const hit = items.find((d) => d.name === p.name)
           const label = level === 'region' ? shortName(p.name) : p.name
@@ -366,13 +376,14 @@ const buildOption = () => {
       },
       regions,
       light: {
-        main: { color: '#ffffff', intensity: 1.35, shadow: true, shadowQuality: 'medium', alpha: 42, beta: 25 },
-        ambient: { color: '#2f6ea8', intensity: 0.45 }
+        // 中性偏亮的环境光，避免 lambert 把顶面压成灰蓝；主光稍降减少过曝
+        main: { color: '#eaf7ff', intensity: 1.15, shadow: true, shadowQuality: 'high', alpha: 45, beta: 22 },
+        ambient: { color: '#7ab4dd', intensity: 0.7 }
       },
       viewControl,
       postEffect: {
         enable: true,
-        bloom: { enable: true, bloomIntensity: 0.1 },
+        bloom: { enable: true, bloomIntensity: 0.22 },
         SSAO: { enable: false }
       },
       temporalSuperSampling: { enable: false }
@@ -472,44 +483,25 @@ defineExpose({ resize })
   overflow: hidden;
 }
 
+/* 地图底部一层柔和光晕，让立体块从深空背景里浮起来；不响应鼠标事件 */
+.fill-rate-map::before {
+  content: '';
+  position: absolute;
+  inset: 6% 4% 0;
+  background: radial-gradient(
+    ellipse at 50% 60%,
+    rgba(28, 152, 220, 0.22) 0%,
+    rgba(10, 46, 94, 0.1) 48%,
+    transparent 74%
+  );
+  pointer-events: none;
+}
+
 .map-canvas {
+  position: relative;
+  z-index: 1;
   width: 100%;
   height: 100%;
   cursor: pointer;
-}
-
-.map-legend {
-  position: absolute;
-  left: 10px;
-  bottom: 8px;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 12px;
-  color: var(--c-text-dim, #7a93c4);
-  pointer-events: none;
-}
-
-.legend-bar {
-  display: block;
-  width: 84px;
-  height: 6px;
-  border-radius: 3px;
-  background: linear-gradient(90deg, #0a2a52 0%, #1176a8 50%, #22c8ff 100%);
-  border: 1px solid rgba(64, 158, 255, 0.35);
-}
-
-.legend-scale {
-  color: #8fb3dd;
-  font-family: 'DIN', 'Consolas', monospace;
-}
-
-.map-tip {
-  position: absolute;
-  right: 10px;
-  bottom: 8px;
-  font-size: 11px;
-  color: rgba(122, 147, 196, 0.65);
-  pointer-events: none;
 }
 </style>

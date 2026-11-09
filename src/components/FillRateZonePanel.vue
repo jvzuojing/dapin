@@ -17,8 +17,6 @@
         :data="coverageCityData"
         :county-data="coverageCountyData"
         :scale-version="scaleVersion"
-        :metric-label="'村社覆盖率'"
-        :tip="mapTip"
         :selected-code="cityCode"
         :selected-county-code="countyCode"
         @select="handleMapSelect"
@@ -98,12 +96,6 @@ const coverageCountyData = computed<FillRateItem[]>(() =>
     .map((item) => ({ name: item.regionName, value: parseRate(item.rate) }))
     .filter((item) => Number.isFinite(item.value))
 )
-
-const usingDemo = computed(() => regionCoverage.value.length === 0)
-const mapTip = computed(() => {
-  if (!cityCode.value) return usingDemo.value ? '示意数据 · 覆盖率接口未返回区域明细' : ''
-  return coverageCountyData.value.length ? '' : '旗县区轮廓 · 暂无旗县区级指标数据'
-})
 
 /** 区划路径第 2 / 3 级的 6 位国标代码，直接驱动地图下钻层级 */
 const codeAt = (index: number) => {

@@ -286,16 +286,23 @@ onBeforeUnmount(() => {
   position: fixed;
   inset: 0;
   overflow: hidden;
+  /* 设计规范：深蓝底 + 顶部/右下蓝色弧光；网格压到几乎不可见，原底图整体压暗 */
   background:
-    linear-gradient(rgba(64, 158, 255, 0.045) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(64, 158, 255, 0.045) 1px, transparent 1px),
+    radial-gradient(ellipse 62% 46% at 50% -12%, rgba(73, 166, 255, 0.18), transparent 70%),
+    radial-gradient(ellipse 48% 58% at 102% 104%, rgba(30, 104, 182, 0.16), transparent 72%),
+    linear-gradient(180deg, rgba(7, 15, 30, 0.74), rgba(7, 15, 30, 0.5)),
+    linear-gradient(rgba(189, 212, 255, 0.022) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(189, 212, 255, 0.022) 1px, transparent 1px),
     url('./assets/bg.png');
   background-size:
+    100% 100%,
+    100% 100%,
+    100% 100%,
     44px 44px,
     44px 44px,
     cover;
-  background-position: 0 0, 0 0, center;
-  background-repeat: repeat, repeat, no-repeat;
+  background-position: 0 0, 0 0, 0 0, 0 0, 0 0, center;
+  background-repeat: no-repeat, no-repeat, no-repeat, repeat, repeat, no-repeat;
 }
 
 .screen-stage {
@@ -334,8 +341,8 @@ onBeforeUnmount(() => {
   align-items: center;
   justify-content: space-between;
   padding: 0 20px;
-  background: linear-gradient(180deg, rgba(64, 158, 255, 0.08) 0%, transparent 100%);
-  border-bottom: 1px solid rgba(64, 158, 255, 0.15);
+  background: linear-gradient(180deg, rgba(73, 166, 255, 0.06) 0%, transparent 100%);
+  border-bottom: 1px solid rgba(189, 212, 255, 0.16);
   margin-bottom: var(--dashboard-gap);
   flex-shrink: 0;
 }
@@ -346,21 +353,23 @@ onBeforeUnmount(() => {
 }
 
 .main-title {
-  font-size: 32px;
-  font-weight: bold;
-  letter-spacing: 4px;
-  background: linear-gradient(180deg, #ffffff 0%, #ffe9a8 45%, #ffd75e 100%);
+  /* 规范一级标题：42px，#A4C4FF → #FFFFFF → #D6DDE7 渐变，无暖色 */
+  font-family: var(--font-title);
+  font-size: 42px;
+  font-weight: normal;
+  letter-spacing: 5px;
+  background: linear-gradient(180deg, #a4c4ff 0%, #ffffff 55%, #d6dde7 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
-  filter: drop-shadow(0 0 10px rgba(255, 215, 94, 0.35));
-  line-height: 1.25;
+  filter: drop-shadow(0 0 12px rgba(164, 196, 255, 0.32));
+  line-height: 1.15;
 }
 
 .header-sub {
   margin-top: 2px;
   font-size: 13px;
-  color: var(--c-text-dim, #7a93c4);
+  color: var(--c-text-dim);
 }
 
 .header-sub span {
@@ -383,19 +392,20 @@ onBeforeUnmount(() => {
 .refresh-btn {
   padding: 8px 20px;
   font-size: 14px;
-  color: #cfe4ff;
+  color: var(--c-aux-blue);
   letter-spacing: 1px;
   cursor: pointer;
-  background: linear-gradient(180deg, rgba(64, 158, 255, 0.28) 0%, rgba(30, 60, 120, 0.5) 100%);
-  border: 1px solid rgba(64, 158, 255, 0.5);
-  border-radius: 4px;
+  background: rgba(20, 36, 66, 0.55);
+  border: 1px solid var(--c-border-bright);
+  border-radius: 2px;
   transition: all 0.2s;
 }
 
 .refresh-btn:hover:not(:disabled) {
   color: #fff;
-  background: linear-gradient(180deg, rgba(64, 158, 255, 0.5) 0%, rgba(30, 60, 120, 0.7) 100%);
-  box-shadow: 0 0 12px rgba(64, 158, 255, 0.45);
+  background: rgba(73, 166, 255, 0.18);
+  border-color: rgba(189, 212, 255, 0.7);
+  box-shadow: 0 0 12px rgba(73, 166, 255, 0.25);
 }
 
 .refresh-btn:disabled {
@@ -408,8 +418,8 @@ onBeforeUnmount(() => {
 }
 
 .region-cascader :deep(.el-input__wrapper) {
-  background: rgba(30, 50, 100, 0.7) !important;
-  box-shadow: 0 0 0 1px rgba(64, 158, 255, 0.5) inset !important;
+  background: rgba(20, 36, 66, 0.85) !important;
+  box-shadow: 0 0 0 1px var(--c-border-bright) inset !important;
 }
 
 .region-cascader :deep(.el-input__inner) {

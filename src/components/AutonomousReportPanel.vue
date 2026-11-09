@@ -2,7 +2,6 @@
   <div class="auto-report panel">
     <div class="panel-title">
       <span class="panel-title-text">自治区报表</span>
-      <span class="data-flag" :class="{ live: isLive }">{{ isLive ? '接口' : '演示' }}</span>
     </div>
 
     <div class="kpi-row">
@@ -19,11 +18,22 @@
     <div class="sec-title">数据分布情况</div>
     <div ref="barRef" class="chart-bar"></div>
 
-    <div class="sec-title">报表名称</div>
-    <el-table :data="view.tableData" size="small" class="list-table" height="360">
-      <el-table-column type="index" label="序号" width="48" align="center" />
-      <el-table-column prop="name" label="数据表名称" min-width="180" show-overflow-tooltip />
-      <el-table-column prop="dept" label="发布部门名称" width="150" show-overflow-tooltip />
+    <el-table :data="view.tableData" size="small" class="list-table" height="382">
+      <el-table-column type="index" label="序号" width="48" align="center" show-overflow-tooltip />
+      <el-table-column prop="name" label="数据表名称" min-width="180">
+        <template #default="{ row }">
+          <el-tooltip :content="row.name" effect="dark" placement="top" :show-after="100" popper-class="cell-full-tip">
+            <span class="cell-ellipsis">{{ row.name }}</span>
+          </el-tooltip>
+        </template>
+      </el-table-column>
+      <el-table-column prop="dept" label="发布部门名称" width="150">
+        <template #default="{ row }">
+          <el-tooltip :content="row.dept" effect="dark" placement="top" :show-after="100" popper-class="cell-full-tip">
+            <span class="cell-ellipsis">{{ row.dept }}</span>
+          </el-tooltip>
+        </template>
+      </el-table-column>
     </el-table>
   </div>
 </template>
@@ -36,7 +46,6 @@ import type { FillCountVO } from '../types/api'
 
 /** 接口数据（getFillCount，isExtended=false）；未取到时降级为演示数据 */
 const { autonomousFillCount } = useDashboardApi()
-const isLive = computed(() => autonomousFillCount.value !== null)
 
 /** 演示数据：接口不可用 / 演示模式时保留原效果 */
 const MOCK = {
@@ -93,14 +102,25 @@ const barRef = ref<HTMLElement | null>(null)
 let chart: echarts.ECharts | null = null
 let ro: ResizeObserver | null = null
 
+/** 轴标签统一限制字数，超出用省略号；悬停仍显示完整名称 */
+const clipLabel = (text: string, max = 8) => (text.length > max ? `${text.slice(0, max)}…` : text)
+
 /** 单独抽出渲染函数：接口数据异步到达后重新 setOption */
 const renderBar = () => {
   if (!chart) return
   const dist = view.value.deptDist
   chart.setOption(
     {
-      tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
-      grid: { top: 4, right: 30, bottom: 4, left: 6, containLabel: true },
+      tooltip: {
+        trigger: 'axis',
+        axisPointer: { type: 'shadow' },
+        formatter: (params: any) => {
+          const p = Array.isArray(params) ? params[0] : params
+          if (!p) return ''
+          return `${p.name}<br/>报表数：${p.value} 张`
+        }
+      },
+      grid: { top: 4, right: 30, bottom: 4, left: 14, containLabel: true },
       dataZoom: [
         {
           type: 'inside',
@@ -123,7 +143,11 @@ const renderBar = () => {
         data: dist.map((d) => d.name),
         axisLine: { lineStyle: { color: 'rgba(64,158,255,0.2)' } },
         axisTick: { show: false },
-        axisLabel: { color: '#7a93c4', fontSize: 10, width: 84, overflow: 'truncate' }
+        axisLabel: {
+          color: '#a9c8f5', fontSize: 11, width: 108, margin: 10,
+          overflow: 'truncate', rotate: 20,
+          formatter: (v: string) => clipLabel(v)
+        }
       },
       series: [
         {
@@ -168,24 +192,6 @@ onBeforeUnmount(() => {
   display: flex;
   flex-direction: column;
   min-height: 0;
-}
-
-.data-flag {
-  flex: 0 0 auto;
-  font-size: 10px;
-  font-weight: normal;
-  letter-spacing: 0;
-  line-height: 1.4;
-  padding: 1px 6px;
-  border: 1px solid rgba(122, 147, 196, 0.35);
-  border-radius: 8px;
-  color: #7a93c4;
-  white-space: nowrap;
-}
-
-.data-flag.live {
-  color: #5dd39e;
-  border-color: rgba(93, 211, 158, 0.45);
 }
 
 .kpi-row {

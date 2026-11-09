@@ -677,10 +677,10 @@ onBeforeUnmount(() => {
 }
 
 .legend-val {
-  color: var(--c-gold, #ffd75e);
+  color: var(--c-gold, #ffc75a);
   font-weight: bold;
   font-family: 'Consolas', monospace;
-  text-shadow: 0 0 6px rgba(255, 215, 94, 0.4);
+  text-shadow: 0 0 6px rgba(255, 199, 90, 0.28);
 }
 
 .legend-swatch {

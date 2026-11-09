@@ -1,6 +1,6 @@
 <template>
   <div class="right-panel-root">
-    <!-- 系统使用情况 -->
+    <!-- 系统使用情况：按设计稿三块同屏展示（访问走势 / 地区情况 / 部门访问列表） -->
     <div
       v-loading="rightTopLoading"
       element-loading-text="系统使用情况加载中..."
@@ -9,37 +9,16 @@
     >
       <div class="panel-title">
         <span class="panel-title-text">系统使用情况</span>
-        <button v-if="sysTab === 'dept'" class="panel-action-btn" @click="showDeptDialog = true">查看全部</button>
       </div>
 
       <div class="sys-summary">
         <div class="sys-stat">
-          <div class="sys-label">总访问量</div>
-          <div class="sys-value">{{ systemUsageAll.total }}</div>
+          <span class="sys-label">总访问量：</span>
+          <span class="sys-value">{{ systemUsageAll.total }}</span>
         </div>
         <div class="sys-stat">
-          <div class="sys-label">日活跃次数</div>
-          <div class="sys-value">{{ systemUsageAll.dailyActive }}</div>
-        </div>
-      </div>
-
-      <div class="sys-toolbar">
-        <div class="dashboard-tabs">
-          <span
-            class="dashboard-tab"
-            :class="{ active: sysTab === 'all' }"
-            @click="switchSysTab('all')"
-          >全部</span>
-          <span
-            class="dashboard-tab"
-            :class="{ active: sysTab === 'city' }"
-            @click="switchSysTab('city')"
-          >按地市</span>
-          <span
-            class="dashboard-tab"
-            :class="{ active: sysTab === 'dept' }"
-            @click="switchSysTab('dept')"
-          >按部门</span>
+          <span class="sys-label">日活跃次数：</span>
+          <span class="sys-value">{{ systemUsageAll.dailyActive }}</span>
         </div>
         <el-select v-model="queryPeriod" class="period-select" size="small" placeholder="查询周期">
           <el-option label="查询周期" value="" disabled />
@@ -50,7 +29,47 @@
         </el-select>
       </div>
 
-      <div ref="sysChartRef" class="chart-sys"></div>
+      <div class="sys-section">
+        <div class="sys-section-title">访问走势</div>
+        <div ref="trendChartRef" class="sys-chart"></div>
+      </div>
+
+      <div class="sys-section">
+        <div class="sys-section-title">地区情况</div>
+        <div ref="cityChartRef" class="sys-chart"></div>
+      </div>
+
+      <div class="sys-section sys-section-dept">
+        <div class="sys-section-title">
+          部门访问列表
+          <button class="panel-action-btn" @click="showDeptDialog = true">查看全部</button>
+        </div>
+        <div class="dept-inline-overview">
+          <div class="dept-inline-card">
+            <div class="dept-inline-label">部门数</div>
+            <div class="dept-inline-value">{{ deptAccessList.length }}</div>
+          </div>
+          <div class="dept-inline-card">
+            <div class="dept-inline-label">总访问量</div>
+            <div class="dept-inline-value">{{ totalDeptVisits }}</div>
+          </div>
+          <div class="dept-inline-card dept-inline-wide">
+            <div class="dept-inline-label">最高访问部门</div>
+            <div class="dept-inline-value dept-inline-text">{{ topDeptAccess.department }}</div>
+            <div class="dept-inline-extra">访问次数 {{ topDeptAccess.visits }}</div>
+          </div>
+        </div>
+        <div class="dept-inline-table">
+          <div class="dept-row dept-row-head">
+            <span>排名</span><span>部门名称</span><span>访问次数</span>
+          </div>
+          <div v-for="(row, idx) in inlineDeptRows" :key="idx" class="dept-row">
+            <span class="dept-rank" :class="`dept-rank-${Math.min(idx + 1, 4)}`">{{ idx + 1 }}</span>
+            <span class="dept-name" :title="row.department">{{ row.department }}</span>
+            <span class="cell-cyan">{{ row.visits }}</span>
+          </div>
+        </div>
+      </div>
     </div>
 
     <!-- 数据使用情况 -->
@@ -63,7 +82,24 @@
       <div class="usage-block">
         <div class="usage-header">
           <span class="usage-label">基层特色场景：</span>
-          <span class="usage-num">23个</span>
+          <span class="usage-num">{{ sceneCount }}个</span>
+        </div>
+      </div>
+
+      <div class="usage-block scene-bubbles-block">
+        <div class="scene-bubbles">
+          <div class="scene-bubble bubble-base">
+            <div class="bubble-value">{{ sceneData.baseScenes.length }}个</div>
+            <div class="bubble-label">基础场景</div>
+          </div>
+          <div class="scene-bubble bubble-extend">
+            <div class="bubble-value">{{ sceneData.extendScenes.length }}个</div>
+            <div class="bubble-label">扩展表场景</div>
+          </div>
+          <div class="scene-bubble bubble-other">
+            <div class="bubble-value">{{ sceneData.otherScenes.length }}个</div>
+            <div class="bubble-label">其他场景</div>
+          </div>
         </div>
       </div>
 
@@ -231,180 +267,139 @@ import { useDashboardApi } from '../composables/useDashboardApi'
 
 const { systemUsageAll, systemUsageCity, systemUsageDept, rootDatabase, backflowData, politicalLegalData, sceneData } = useScaledData()
 const { selectedRegion, scaleVersion } = useRegionData()
-const { setAccessTimeType, loadAccessList, accessDeptList, globalDataLoading, accessTimeLoading, reportStats } = useDashboardApi()
+const { setAccessTimeType, loadAccessList, accessRegionList, accessDeptList, globalDataLoading, accessTimeLoading, reportStats } = useDashboardApi()
 
 const showSceneDialog = ref(false)
 const showDeptDialog = ref(false)
 
 const dpr = window.devicePixelRatio || 1
 
-// Sys tab
-const sysTab = ref<'all' | 'city' | 'dept'>('all')
 const queryPeriod = ref('week')
-
-/** 切 tab：市级/部门 tab 点击时才拉取对应的使用情况数据（避免初始化时重复请求） */
-const switchSysTab = (tab: 'all' | 'city' | 'dept') => {
-  if (sysTab.value === tab) return
-  sysTab.value = tab
-  if (tab === 'city') loadAccessList('region')
-  else if (tab === 'dept') loadAccessList('dept')
-}
 
 // 部门访问列表弹窗：数据未加载过时按需拉取
 watch(showDeptDialog, (visible) => {
   if (visible && !accessDeptList.value) loadAccessList('dept')
 })
 
-const visibleDeptChart = computed(() => {
-  const maxItems = 10
-  return {
-    departments: systemUsageDept.value.departments.slice(0, maxItems),
-    visits: systemUsageDept.value.visits.slice(0, maxItems)
-  }
-})
-
 const rightTopLoading = computed(() => globalDataLoading.value || accessTimeLoading.value)
+
+/** 三块同屏后，地区/部门明细在挂载时一次取回，不再依赖 tab 点击 */
+const loadSysDetails = () => {
+  loadAccessList('region')
+  loadAccessList('dept')
+}
+
+/** 基层特色场景总数（与下方三个气泡的和一致） */
+const sceneCount = computed(() =>
+  sceneData.value.baseScenes.length + sceneData.value.extendScenes.length + sceneData.value.otherScenes.length
+)
 
 const shortenAxisLabel = (label: string, max = 6) => (
   label.length > max ? `${label.slice(0, max)}...` : label
 )
 
-// Sys chart
-const sysChartRef = ref<HTMLElement | null>(null)
-let sysChart: echarts.ECharts | null = null
+/* ---------------- 访问走势折线 + 地区情况柱状（两块同屏） ---------------- */
+const trendChartRef = ref<HTMLElement | null>(null)
+const cityChartRef = ref<HTMLElement | null>(null)
+let trendChart: echarts.ECharts | null = null
+let cityChart: echarts.ECharts | null = null
 
-const initSysChart = () => {
-  if (!sysChartRef.value) return
-  sysChart = echarts.init(sysChartRef.value, undefined, { devicePixelRatio: dpr })
-  updateSysChart()
-}
-
-const updateSysChart = () => {
-  if (!sysChart) return
-
-  if (sysTab.value === 'all') {
-    // 折线图 - 趋势
-    sysChart.setOption({
-      tooltip: { trigger: 'axis' },
-      grid: { top: 24, right: 18, bottom: 24, left: 48, containLabel: true },
-      xAxis: {
-        type: 'category',
-        data: systemUsageAll.value.dates,
-        axisLine: { lineStyle: { color: 'rgba(64,158,255,0.2)' } },
-        axisLabel: { color: '#7a93c4', fontSize: 12, margin: 10 }
-      },
-      yAxis: {
-        type: 'value',
-        axisLine: { show: false },
-        axisLabel: { color: '#7a93c4', fontSize: 12, margin: 8 },
-        splitLine: { lineStyle: { color: 'rgba(64,158,255,0.08)' } }
-      },
-      series: [
-        {
-          name: '访问量',
-          type: 'line',
-          data: systemUsageAll.value.visits,
-          smooth: true,
-          itemStyle: { color: '#40e0ff' },
-          lineStyle: { width: 2 },
-          symbol: 'circle',
-          symbolSize: 7,
-          label: { show: false },
-          areaStyle: {
-            color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-              { offset: 0, color: 'rgba(64,224,255,0.4)' },
-              { offset: 1, color: 'rgba(64,224,255,0.02)' }
-            ])
-          }
-        }
-      ]
-    }, true)
-  } else if (sysTab.value === 'city') {
-    // 按地市柱状图
-    sysChart.setOption({
-      tooltip: { trigger: 'axis' },
-      grid: { top: 22, right: 18, bottom: 34, left: 48, containLabel: true },
-      xAxis: {
-        type: 'category',
-        data: systemUsageCity.value.cities,
-        axisLine: { lineStyle: { color: 'rgba(64,158,255,0.2)' } },
-        axisLabel: {
-          color: '#7a93c4',
-          fontSize: 11,
-          interval: 0,
-          rotate: 28,
-          margin: 6,
-          formatter: (value: string) => shortenAxisLabel(value, 4)
-        }
-      },
-      yAxis: {
-        type: 'value',
-        axisLine: { show: false },
-        axisLabel: { color: '#7a93c4', fontSize: 12, margin: 8 },
-        splitLine: { lineStyle: { color: 'rgba(64,158,255,0.08)' } }
-      },
-      series: [
-        {
-          name: '访问量',
-          type: 'bar',
-          data: systemUsageCity.value.visits,
-          itemStyle: {
-            color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-              { offset: 0, color: '#409eff' },
-              { offset: 1, color: 'rgba(64,158,255,0.1)' }
-            ]),
-            borderRadius: [2, 2, 0, 0]
-          },
-          barWidth: 14,
-          label: { show: false }
-        }
-      ]
-    }, true)
-  } else {
-    // 按部门柱状图
-    sysChart.setOption({
-      tooltip: { trigger: 'axis' },
-      grid: { top: 22, right: 18, bottom: 38, left: 48, containLabel: true },
-      xAxis: {
-        type: 'category',
-        data: visibleDeptChart.value.departments,
-        axisLine: { lineStyle: { color: 'rgba(64,158,255,0.2)' } },
-        axisLabel: {
-          color: '#7a93c4',
-          fontSize: 11,
-          interval: 0,
-          rotate: 28,
-          margin: 6,
-          formatter: (value: string) => shortenAxisLabel(value, 4)
-        }
-      },
-      yAxis: {
-        type: 'value',
-        axisLine: { show: false },
-        axisLabel: { color: '#7a93c4', fontSize: 12, margin: 8 },
-        splitLine: { lineStyle: { color: 'rgba(64,158,255,0.08)' } }
-      },
-      series: [
-        {
-          name: '访问量',
-          type: 'bar',
-          data: visibleDeptChart.value.visits,
-          itemStyle: {
-            color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-              { offset: 0, color: '#409eff' },
-              { offset: 1, color: 'rgba(64,158,255,0.1)' }
-            ]),
-            borderRadius: [2, 2, 0, 0]
-          },
-          barWidth: 12,
-          label: { show: false }
-        }
-      ]
-    }, true)
+const initCharts = () => {
+  if (trendChartRef.value && !trendChart) {
+    trendChart = echarts.init(trendChartRef.value, undefined, { devicePixelRatio: dpr })
   }
+  if (cityChartRef.value && !cityChart) {
+    cityChart = echarts.init(cityChartRef.value, undefined, { devicePixelRatio: dpr })
+  }
+  updateAllCharts()
 }
 
-watch(sysTab, () => nextTick(() => updateSysChart()))
+const updateTrendChart = () => {
+  if (!trendChart) return
+  trendChart.setOption({
+    tooltip: { trigger: 'axis' },
+    grid: { top: 18, right: 14, bottom: 18, left: 40, containLabel: true },
+    xAxis: {
+      type: 'category',
+      data: systemUsageAll.value.dates,
+      axisLine: { lineStyle: { color: 'rgba(64,158,255,0.2)' } },
+      axisLabel: { color: '#7a93c4', fontSize: 11, margin: 6 }
+    },
+    yAxis: {
+      type: 'value',
+      axisLine: { show: false },
+      axisLabel: { color: '#7a93c4', fontSize: 11, margin: 6 },
+      splitLine: { lineStyle: { color: 'rgba(64,158,255,0.08)' } }
+    },
+    series: [
+      {
+        name: '访问量',
+        type: 'line',
+        data: systemUsageAll.value.visits,
+        smooth: true,
+        itemStyle: { color: '#40e0ff' },
+        lineStyle: { width: 2 },
+        symbol: 'circle',
+        symbolSize: 6,
+        label: { show: true, position: 'top', color: '#bfe6ff', fontSize: 10 },
+        areaStyle: {
+          color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+            { offset: 0, color: 'rgba(64,224,255,0.4)' },
+            { offset: 1, color: 'rgba(64,224,255,0.02)' }
+          ])
+        }
+      }
+    ]
+  }, true)
+}
+
+const updateCityChart = () => {
+  if (!cityChart) return
+  cityChart.setOption({
+    tooltip: { trigger: 'axis' },
+    grid: { top: 18, right: 14, bottom: 34, left: 40, containLabel: true },
+    xAxis: {
+      type: 'category',
+      data: systemUsageCity.value.cities,
+      axisLine: { lineStyle: { color: 'rgba(64,158,255,0.2)' } },
+      axisLabel: {
+        color: '#7a93c4',
+        fontSize: 10,
+        interval: 0,
+        rotate: 28,
+        margin: 6,
+        formatter: (value: string) => shortenAxisLabel(value, 4)
+      }
+    },
+    yAxis: {
+      type: 'value',
+      axisLine: { show: false },
+      axisLabel: { color: '#7a93c4', fontSize: 11, margin: 6 },
+      splitLine: { lineStyle: { color: 'rgba(64,158,255,0.08)' } }
+    },
+    series: [
+      {
+        name: '访问量',
+        type: 'bar',
+        data: systemUsageCity.value.visits,
+        itemStyle: {
+          color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+            { offset: 0, color: '#409eff' },
+            { offset: 1, color: 'rgba(64,158,255,0.1)' }
+          ]),
+          borderRadius: [2, 2, 0, 0]
+        },
+        barWidth: 12,
+        label: { show: true, position: 'top', color: '#bfe6ff', fontSize: 10 }
+      }
+    ]
+  }, true)
+}
+
+const updateAllCharts = () => {
+  updateTrendChart()
+  updateCityChart()
+}
 
 // 查询周期联动接口：切换后重新拉取地区/部门访问数据
 watch(queryPeriod, (period) => {
@@ -412,6 +407,7 @@ watch(queryPeriod, (period) => {
 })
 
 watch(selectedRegion, () => {
+  loadSysDetails()
   nextTick(() => updateAllCharts())
 }, { deep: true })
 
@@ -423,6 +419,9 @@ const deptAccessList = computed(() => systemUsageDept.value.departments.map((dep
   department,
   visits: systemUsageDept.value.visits[index] ?? 0
 })))
+
+/** 内嵌部门列表只显示前 8 行，完整排名在「查看全部」弹窗 */
+const inlineDeptRows = computed(() => deptAccessList.value.slice(0, 8))
 
 // 部门累计访问量：取 getReportStats 的 totalAccessDeptNum；接口未返回时回退为各部门求和
 const totalDeptVisits = computed(() => {
@@ -447,36 +446,36 @@ const topDeptAccess = computed(() => {
   }
 })
 
-const updateAllCharts = () => {
-  updateSysChart()
-}
-
 const resizeAll = () => {
-  sysChart?.resize()
+  trendChart?.resize()
+  cityChart?.resize()
 }
 
-// 接口数据回填后刷新图表
-watch(systemUsageAll, () => nextTick(() => updateSysChart()), { deep: true })
-watch(systemUsageCity, () => nextTick(() => updateSysChart()), { deep: true })
-watch(systemUsageDept, () => nextTick(() => updateSysChart()), { deep: true })
+// 接口数据回填后刷新对应图表；部门表格由响应式数据自动更新
+watch(systemUsageAll, () => nextTick(() => updateTrendChart()), { deep: true })
+watch(systemUsageCity, () => nextTick(() => updateCityChart()), { deep: true })
 
 let resizeHandler: (() => void) | null = null
 let ro: ResizeObserver | null = null
 
 onMounted(() => {
   nextTick(() => {
-    initSysChart()
+    initCharts()
+    loadSysDetails()
   })
   resizeHandler = () => resizeAll()
   window.addEventListener('resize', resizeHandler)
   ro = new ResizeObserver(() => resizeAll())
-  ;[sysChartRef.value].forEach(el => el && ro!.observe(el))
+  ;[trendChartRef.value, cityChartRef.value].forEach(el => el && ro!.observe(el))
 })
 
 onBeforeUnmount(() => {
   window.removeEventListener('resize', resizeHandler!)
   ro?.disconnect()
-  sysChart?.dispose()
+  trendChart?.dispose()
+  cityChart?.dispose()
+  trendChart = null
+  cityChart = null
 })
 </script>
 
@@ -495,32 +494,40 @@ onBeforeUnmount(() => {
   min-height: var(--right-top-min-height, 252px);
   display: flex;
   flex-direction: column;
+  overflow: hidden;
 }
 
 .right-bottom {
   flex: 1.08 1 0;
   display: flex;
   flex-direction: column;
-  justify-content: flex-start;
+  justify-content: space-between;
   min-height: var(--right-bottom-min-height, 286px);
   overflow: hidden;
+  padding-bottom: 8px;
 }
 
-/* 系统使用概览 */
+/* 系统使用概览：两个指标 chip + 查询周期，横排一行 */
 .sys-summary {
   display: flex;
   gap: 6px;
-  margin-bottom: 10px;
+  margin-bottom: 8px;
   flex-shrink: 0;
+  align-items: stretch;
 }
 
 .sys-stat {
-  flex: 1;
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  white-space: nowrap;
   background: var(--c-card-bg, rgba(30, 50, 100, 0.35));
   border: 1px solid var(--c-border, rgba(64, 158, 255, 0.25));
   border-radius: 3px;
-  padding: 8px 8px;
-  text-align: center;
+  padding: 8px 6px;
 }
 
 .sys-label {
@@ -529,21 +536,11 @@ onBeforeUnmount(() => {
 }
 
 .sys-value {
-  font-size: 17px;
+  font-size: 16px;
   font-weight: bold;
   color: var(--c-cyan, #40e0ff);
   font-family: 'DIN', 'Consolas', monospace;
   line-height: 1.3;
-}
-
-.sys-toolbar {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 12px;
-  flex-shrink: 0;
-  flex-wrap: wrap;
 }
 
 .panel-action-btn {
@@ -574,10 +571,176 @@ onBeforeUnmount(() => {
   font-size: 12px !important;
 }
 
-.chart-sys {
+/* 三块同屏：按 flex 比例铺满整列，不再只显示一个 tab 图 */
+.sys-section {
+  flex: 1 1 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 4px 0 6px;
+  border-bottom: 1px solid rgba(64, 158, 255, 0.12);
+}
+
+.sys-section:last-child {
+  border-bottom: none;
+}
+
+.sys-section-dept {
+  flex: 1.55 1 0;
+}
+
+.sys-section-title {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 13px;
+  font-weight: 600;
+  color: #8fd9ff;
+  padding-left: 8px;
+  border-left: 3px solid #40e0ff;
+  margin-bottom: 4px;
+}
+
+.sys-chart {
+  flex: 1 1 auto;
+  min-height: 84px;
   width: 100%;
-  flex: 1;
-  min-height: var(--sys-chart-min-height, 142px);
+}
+
+/* 内嵌部门访问列表 */
+.dept-inline-overview {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1.4fr;
+  gap: 6px;
+  flex: 0 0 auto;
+  margin-bottom: 6px;
+}
+
+.dept-inline-card {
+  min-width: 0;
+  padding: 5px 8px;
+  border-radius: 5px;
+  border: 1px solid rgba(64, 158, 255, 0.22);
+  background: linear-gradient(180deg, rgba(20, 44, 92, 0.5), rgba(10, 24, 58, 0.45));
+}
+
+.dept-inline-label {
+  font-size: 10px;
+  color: #7a93c4;
+}
+
+.dept-inline-value {
+  margin-top: 2px;
+  color: #40e0ff;
+  font-size: 17px;
+  font-weight: bold;
+  font-family: 'DIN', 'Consolas', monospace;
+  line-height: 1.1;
+}
+
+.dept-inline-wide .dept-inline-value {
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.dept-inline-extra {
+  font-size: 10px;
+  color: #7a93c4;
+}
+
+.dept-inline-table {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.dept-row {
+  display: grid;
+  grid-template-columns: 34px 1fr 68px;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 8px;
+  font-size: 11px;
+  color: #cfe3ff;
+  border-bottom: 1px solid rgba(64, 158, 255, 0.1);
+  flex: 0 0 auto;
+}
+
+.dept-row-head {
+  color: #40e0ff;
+  background: rgba(30, 50, 100, 0.5);
+  font-weight: 600;
+}
+
+.dept-name {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.dept-inline-table .dept-rank {
+  width: 19px;
+  height: 19px;
+  font-size: 10px;
+}
+
+/* 基层特色场景三个圆形气泡 */
+.scene-bubbles {
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+  gap: 10px;
+  padding: 10px 6px 14px;
+}
+
+.scene-bubble {
+  position: relative;
+  width: 22%;
+  max-width: 118px;
+  min-width: 80px;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: #0a2a44;
+  border: 1px solid rgba(200, 245, 255, 0.35);
+  text-shadow: 0 1px 2px rgba(255, 255, 255, 0.35);
+  box-shadow: inset 0 0 20px rgba(255, 255, 255, 0.22), 0 0 22px rgba(64, 200, 255, 0.2);
+}
+
+.bubble-base {
+  background: radial-gradient(circle at 34% 26%, #e6ffff, #63d6de 42%, #145f8c 100%);
+}
+
+.bubble-extend {
+  background: radial-gradient(circle at 34% 26%, #f7ffd2, #b2e84a 45%, #40781c 100%);
+  box-shadow: inset 0 0 20px rgba(255, 255, 255, 0.25), 0 0 22px rgba(178, 232, 74, 0.22);
+}
+
+.bubble-other {
+  background: radial-gradient(circle at 34% 26%, #f2e6ff, #aa8cdc 45%, #482c78 100%);
+  box-shadow: inset 0 0 20px rgba(255, 255, 255, 0.25), 0 0 22px rgba(170, 140, 220, 0.22);
+}
+
+.bubble-value {
+  font-size: 20px;
+  font-weight: 700;
+  font-family: 'DIN', 'Consolas', monospace;
+  line-height: 1.1;
+}
+
+.bubble-label {
+  font-size: 12px;
+  font-weight: 600;
+  margin-top: 3px;
+  white-space: nowrap;
 }
 
 /* 数据使用 */
@@ -712,8 +875,8 @@ onBeforeUnmount(() => {
 .usage-num {
   font-size: 14px;
   font-weight: bold;
-  color: var(--c-gold, #ffd75e);
-  text-shadow: 0 0 6px rgba(255, 215, 94, 0.4);
+  color: var(--c-gold, #ffc75a);
+  text-shadow: 0 0 6px rgba(255, 199, 90, 0.28);
   font-family: 'DIN', 'Consolas', monospace;
 }
 
@@ -788,8 +951,8 @@ onBeforeUnmount(() => {
 .bf-value {
   font-size: 15px;
   font-weight: bold;
-  color: var(--c-gold, #ffd75e);
-  text-shadow: 0 0 6px rgba(255, 215, 94, 0.4);
+  color: var(--c-gold, #ffc75a);
+  text-shadow: 0 0 6px rgba(255, 199, 90, 0.28);
   font-family: 'DIN', 'Consolas', monospace;
 }
 
@@ -941,7 +1104,7 @@ onBeforeUnmount(() => {
 
 .dept-overview-extra {
   margin-top: 6px;
-  color: #ffd75e;
+  color: var(--c-gold, #ffc75a);
   font-size: 12px;
 }
 
@@ -968,8 +1131,8 @@ onBeforeUnmount(() => {
 
 .dept-rank-1 {
   color: #0f1a36;
-  background: linear-gradient(180deg, #fff3c4, #ffd75e);
-  border-color: rgba(255, 215, 94, 0.5);
+  background: linear-gradient(180deg, #fff3d6, #ffc75a);
+  border-color: rgba(255, 199, 90, 0.5);
 }
 
 .dept-rank-2 {

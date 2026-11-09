@@ -16,9 +16,17 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import EntityBlock from './EntityBlock.vue'
-import { useScaledData } from '../composables/useRegionData'
+import { useScaledData, useRegionData } from '../composables/useRegionData'
 
 const { entityData } = useScaledData()
+const { regionDepth } = useRegionData()
+
+/** 柱状图下方的说明文字，随下钻层级变化 */
+const AXIS_TITLE: Record<number, string> = {
+  1: '各盟市基层治理量',
+  2: '各旗县区基层治理量',
+  3: '各街道基层治理量'
+}
 
 /** 词云标签只取最后一个「/」后的文字 */
 function lastTagSegment(name: string): string {
@@ -37,6 +45,7 @@ interface BlockDef {
   rates: number[]
   cloudWords?: Array<{ name: string; value: number }>
   donuts?: Array<{ title: string; data: Array<{ name: string; value: number }> }>
+  axisTitle?: string
   empty?: boolean
 }
 
@@ -82,11 +91,12 @@ const blocks = computed<BlockDef[]>((): BlockDef[] => defs.map((def): BlockDef =
   } else if (def.key === 'qi' && typeStats.length) {
     donutDefs.push({ title: '企业类型分布情况', data: typeStats })
   }
-  return {
-    title: def.title,
-    total: entity.total ?? '--',
-    tagTotal: def.key === 'ren' ? (entity.tagTotal ?? '') : '',
-    axisLabels: Array.isArray(entity.axisLabels) ? entity.axisLabels : [],
+    return {
+      title: def.title,
+      total: entity.total ?? '--',
+      tagTotal: def.key === 'ren' ? (entity.tagTotal ?? '') : '',
+      axisTitle: AXIS_TITLE[regionDepth.value] ?? AXIS_TITLE[1],
+      axisLabels: Array.isArray(entity.axisLabels) ? entity.axisLabels : [],
     trend: Array.isArray(entity.governanceTrend) ? entity.governanceTrend : [],
     rates: Array.isArray(entity.completionRates) ? entity.completionRates : [],
     cloudWords: def.key === 'ren' && Array.isArray(entity.cloudWords)

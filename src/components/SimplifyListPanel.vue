@@ -2,7 +2,6 @@
   <div class="simplify-list panel">
     <div class="panel-title">
       <span class="panel-title-text">基层精简保留清单</span>
-      <span class="data-flag" :class="{ live: isLive }">{{ isLive ? '接口' : '演示' }}</span>
     </div>
 
     <div class="kpi-row">
@@ -31,14 +30,25 @@
       </div>
     </div>
 
-    <div class="sec-title">报表清单</div>
-    <el-table :data="view.tableData" size="small" class="list-table" height="300">
-      <el-table-column type="index" label="序号" width="42" align="center" />
-      <el-table-column prop="name" label="数据表名称" min-width="140" show-overflow-tooltip />
-      <el-table-column prop="dept" label="发布部门名称" width="112" show-overflow-tooltip />
-      <el-table-column prop="cycle" label="填报周期" width="76" align="center" />
-      <el-table-column prop="dataTotal" label="数据量" width="62" align="center" />
-      <el-table-column prop="date" label="发布时间" width="100" align="center" />
+    <el-table :data="view.tableData" size="small" class="list-table" height="322">
+      <el-table-column type="index" label="序号" width="42" align="center" show-overflow-tooltip />
+      <el-table-column prop="name" label="数据表名称" min-width="140">
+        <template #default="{ row }">
+          <el-tooltip :content="row.name" effect="dark" placement="top" :show-after="100" popper-class="cell-full-tip">
+            <span class="cell-ellipsis">{{ row.name }}</span>
+          </el-tooltip>
+        </template>
+      </el-table-column>
+      <el-table-column prop="dept" label="发布部门名称" width="112">
+        <template #default="{ row }">
+          <el-tooltip :content="row.dept" effect="dark" placement="top" :show-after="100" popper-class="cell-full-tip">
+            <span class="cell-ellipsis">{{ row.dept }}</span>
+          </el-tooltip>
+        </template>
+      </el-table-column>
+      <el-table-column prop="cycle" label="填报周期" width="76" align="center" show-overflow-tooltip />
+      <el-table-column prop="dataTotal" label="数据量" width="62" align="center" show-overflow-tooltip />
+      <el-table-column prop="date" label="发布时间" width="100" align="center" show-overflow-tooltip />
     </el-table>
   </div>
 </template>
@@ -51,7 +61,6 @@ import type { FillCountVO } from '../types/api'
 
 /** 接口数据（getFillCount，isExtended=true）；未取到时降级为演示数据 */
 const { simplifyFillCount } = useDashboardApi()
-const isLive = computed(() => simplifyFillCount.value !== null)
 
 /** 演示数据：接口不可用 / 演示模式时保留原效果 */
 const CYCLES = ['每月', '每季度', '每年', '每周']
@@ -130,6 +139,9 @@ let ro: ResizeObserver | null = null
 
 const DONUT_COLORS = ['#40e0ff', '#5dd39e', '#f5a623', '#9b8cff', '#ff7a6b', '#4ea1ff']
 
+/** 轴标签统一限制字数，超出用省略号；悬停仍显示完整名称 */
+const clipLabel = (text: string, max = 8) => (text.length > max ? `${text.slice(0, max)}…` : text)
+
 /** 单独抽出渲染函数：接口数据异步到达后重新 setOption */
 const renderCharts = () => {
   const deptDist = view.value.deptDist
@@ -138,8 +150,16 @@ const renderCharts = () => {
   if (barChart) {
     barChart.setOption(
       {
-        tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
-        grid: { top: 4, right: 26, bottom: 4, left: 4, containLabel: true },
+        tooltip: {
+          trigger: 'axis',
+          axisPointer: { type: 'shadow' },
+          formatter: (params: any) => {
+            const p = Array.isArray(params) ? params[0] : params
+            if (!p) return ''
+            return `${p.name}<br/>报表数：${p.value} 张`
+          }
+        },
+        grid: { top: 4, right: 26, bottom: 4, left: 12, containLabel: true },
         dataZoom: [
           {
             type: 'inside',
@@ -162,7 +182,11 @@ const renderCharts = () => {
           data: deptDist.map((d) => d.name),
           axisLine: { lineStyle: { color: 'rgba(64,158,255,0.2)' } },
           axisTick: { show: false },
-          axisLabel: { color: '#7a93c4', fontSize: 10, width: 70, overflow: 'truncate' }
+          axisLabel: {
+            color: '#a9c8f5', fontSize: 11, width: 96, margin: 10,
+            overflow: 'truncate', rotate: 20,
+            formatter: (v: string) => clipLabel(v)
+          }
         },
         series: [
           {
@@ -241,24 +265,6 @@ onBeforeUnmount(() => {
   display: flex;
   flex-direction: column;
   min-height: 0;
-}
-
-.data-flag {
-  flex: 0 0 auto;
-  font-size: 10px;
-  font-weight: normal;
-  letter-spacing: 0;
-  line-height: 1.4;
-  padding: 1px 6px;
-  border: 1px solid rgba(122, 147, 196, 0.35);
-  border-radius: 8px;
-  color: #7a93c4;
-  white-space: nowrap;
-}
-
-.data-flag.live {
-  color: #5dd39e;
-  border-color: rgba(93, 211, 158, 0.45);
 }
 
 .kpi-row {
