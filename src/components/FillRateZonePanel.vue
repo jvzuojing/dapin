@@ -105,6 +105,10 @@ const codeAt = (index: number) => {
 const cityCode = computed(() => codeAt(1))
 const countyCode = computed(() => codeAt(2))
 
+/** 6 位国标码 → 与区划树一致的 12 位码，保证兜底路径也能被左上角级联选中 */
+const toRegionCode = (code: string, fallback = '') =>
+  /^\d{6}$/.test(code) ? `${code}000000` : code || fallback
+
 /** 区划树根节点（自治区）与它的盟市、旗县区子节点 */
 const rootOption = computed(() => regionCascaderOptions.value[0])
 const cityOption = computed(() => {
@@ -153,8 +157,12 @@ const handleMapSelect = (item: FillRateItem) => {
     if (root && league) {
       selectedRegion.value = [root.value, league.value]
     } else {
-      // 无区划树（演示模式）时直接用国标代码驱动地图
-      selectedRegion.value = [selectedRegion.value[0] ?? '150000', code || item.name]
+      // 无区划树（接口未就绪 / 演示模式）时用 12 位码兜底，
+      // 保证左上角级联选择器与标题仍能对上，地图视图也能正常下钻
+      selectedRegion.value = [
+        selectedRegion.value[0] || '150000000000',
+        toRegionCode(code, item.name)
+      ]
     }
     return
   }
@@ -168,9 +176,9 @@ const handleMapSelect = (item: FillRateItem) => {
     selectedRegion.value = [root.value, city.value, county.value]
   } else {
     selectedRegion.value = [
-      selectedRegion.value[0] ?? '150000',
-      selectedRegion.value[1] ?? cityCode.value,
-      code || item.name
+      selectedRegion.value[0] || '150000000000',
+      selectedRegion.value[1] || toRegionCode(cityCode.value),
+      toRegionCode(code, item.name)
     ]
   }
 }

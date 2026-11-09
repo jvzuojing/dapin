@@ -81,7 +81,7 @@ import RightPanel from './components/RightPanel.vue'
 import { useDashboardApi } from './composables/useDashboardApi'
 import { apiConfig } from './config/api'
 
-const { regionCascaderOptions, getRegionPath, initRegionTree, loadRegionData, loadGlobalData, loadAll, refreshAll, defaultRegionCode } = useDashboardApi()
+const { regionCascaderOptions, initRegionTree, loadRegionData, loadGlobalData, loadAll, refreshAll, defaultRegionCode } = useDashboardApi()
 
 // 是否走真实接口（可在 config/api.ts 或 localStorage 中切换）
 const useApi = apiConfig.useApi
@@ -177,25 +177,16 @@ watch(selectedRegion, async (value) => {
   if (!useApi || bootstrapping) return
   const code = lastCode(value)
   if (!code || code === activeCode) return
-  const prev = activeCode
-  const prevPath = [...activePath]
   pageLoading.value = true
   try {
     const ok = await loadRegionData(code)
-    if (ok) {
-      await loadGlobalData()
-      activeCode = code
-      activePath = [...value]
-      return
-    }
-    ElMessage.error('当前区划无数据权限，已回退到上一级')
-    activeCode = prev
-    activePath = prevPath
-    selectedRegion.value = prevPath.length ? prevPath : (prev ? getRegionPath(prev) : [])
-    if (prev) {
-      await loadRegionData(prev)
-      await loadGlobalData()
-    }
+    await loadGlobalData(code)
+    // 点地图 / 选下拉后必须停留在用户选中的区划：
+    // 旧逻辑在接口返回 302 时把 selectedRegion 弹回上一级，地图刚下钻就被拉回全区，
+    // 左上角也跟着跳回去，表现为「点哪里都没反应」。
+    activeCode = code
+    activePath = [...value]
+    if (!ok) ElMessage.warning('当前区划暂无数据权限，部分数据可能为空')
   } finally {
     pageLoading.value = false
   }

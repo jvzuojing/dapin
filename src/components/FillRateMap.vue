@@ -391,15 +391,18 @@ const buildOption = () => {
     series: [
       {
         // 事件层：geo3D 组件不派发区域点击事件（echarts-gl 已知限制），
-        // 叠一层完全透明的 map3D series 专职接收点击
+        // 叠一层近乎透明的 map3D series 专职接收点击。
+        // opacity 必须 > 0：完全透明的 mesh 会被 WebGL 跳过，射线拾取不到区域，
+        // 表现为「点地图没反应、无法下钻」；同时把它放到视觉层之上避免被 geo3D 遮挡。
         type: 'map3D',
         map: resolved.name,
         boxWidth: 100,
         boxDepth,
         regionHeight: 1.85,
-        zlevel: -10,
-        itemStyle: { opacity: 0 },
-        emphasis: { itemStyle: { opacity: 0 }, label: { show: false } },
+        zlevel: 1,
+        silent: false,
+        itemStyle: { opacity: 0.008 },
+        emphasis: { itemStyle: { opacity: 0.008 }, label: { show: false } },
         label: { show: false },
         viewControl: { ...viewControl }
       }
@@ -425,9 +428,19 @@ const init = () => {
   const dpr = Math.min(window.devicePixelRatio || 1, 2)
   chart = echarts.init(chartRef.value, undefined, { devicePixelRatio: dpr })
   render()
-  chart.on('click', (params: any) => {
-    const name = String(params?.name ?? '')
+
+  // 3D 拾取在不同 echarts-gl 版本里可能只派发 click 或只派发 mouseup，
+  // 两个通道都接，并用「同名 + 短时间」去重，保证一次点击只下钻一次。
+  let lastPickName = ''
+  let lastPickAt = 0
+  const pickRegion = (params: any) => {
+    const name = String(params?.name ?? params?.data?.name ?? params?.region?.name ?? '')
     if (!name) return
+    const now = Date.now()
+    if (name === lastPickName && now - lastPickAt < 400) return
+    lastPickName = name
+    lastPickAt = now
+
     const level = currentLevel
     const items = level === 'region' ? validData.value : validCountyData.value
     const hit = items.find((d) => d.name === name)
@@ -442,7 +455,9 @@ const init = () => {
       viewLevel: level,
       parentCode: level === 'county' ? props.selectedCode : undefined
     })
-  })
+  }
+  chart.on('click', pickRegion)
+  chart.on('mouseup', pickRegion)
 }
 
 onMounted(() => {
