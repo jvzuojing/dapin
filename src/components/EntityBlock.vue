@@ -80,11 +80,10 @@ let ro: ResizeObserver | null = null
 
 const PIE_COLORS = ['#40e0ff', '#5dd39e', '#409eff', '#6ab7ff', '#f5a623', '#9b8cff', '#1ed1a8', '#5b8ff9', '#30bf78', '#ffd166']
 
-/** 地区名缩写：去掉行政后缀，最多 3 个字符，超出用省略号；悬停仍显示全称 */
-const shortAxisLabel = (label: string) => {
-  const name = label.replace(/(自治旗|自治县|自治盟|市|盟|旗|县|区)$/u, '')
-  const base = name || label
-  return base.length > 3 ? `${base.slice(0, 2)}…` : base
+/** 刻度文字：完整地区名最多 7 字（超出省略），竖排每字一行，保证 12 个刻度全部显示 */
+const axisLabelText = (label: string) => {
+  const text = label.length > 7 ? `${label.slice(0, 6)}…` : label
+  return text.split('').join('\n')
 }
 
 const renderTrend = () => {
@@ -100,27 +99,27 @@ const renderTrend = () => {
     },
     legend: {
       data: ['基层治理量'],
-      textStyle: { color: '#a9c8f5', fontSize: 11 },
+      textStyle: { color: '#a9c8f5', fontSize: 12 },
       top: 0,
       left: 'center',
       itemWidth: 10,
       itemHeight: 8
     },
-    grid: { top: 26, right: 10, bottom: 38, left: 8, containLabel: true },
+    grid: { top: 20, right: 10, bottom: 96, left: 8, containLabel: true },
     xAxis: {
       type: 'category',
       data: props.axisLabels,
       axisLine: { lineStyle: { color: 'rgba(64,158,255,0.2)' } },
       axisTick: { alignWithLabel: true, lineStyle: { color: 'rgba(64,158,255,0.25)' } },
       axisLabel: {
-        color: '#a9c8f5', fontSize: 10, interval: 1, rotate: 50, margin: 8,
-        formatter: (v: string) => shortAxisLabel(v)
+        color: '#cfe4ff', fontSize: 11, lineHeight: 13, interval: 0, rotate: 0, margin: 8,
+        formatter: (v: string) => axisLabelText(v)
       }
     },
     yAxis: {
       type: 'value',
       axisLine: { show: false },
-      axisLabel: { color: '#9ab9e6', fontSize: 10 },
+      axisLabel: { color: '#9ab9e6', fontSize: 11 },
       splitLine: { lineStyle: { color: 'rgba(64,158,255,0.08)' } }
     },
     series: [{
@@ -278,7 +277,7 @@ defineExpose({ resize: () => {
 }
 
 .block-main {
-  flex: 1.5 1 0;
+  flex: 1.75 1 0;
   min-width: 0;
   min-height: 0;
   display: flex;
