@@ -387,7 +387,9 @@ const updateTrendChart = () => {
         lineStyle: { width: 2 },
         symbol: 'circle',
         symbolSize: 6,
-        label: { show: true, position: 'top', color: '#bfe6ff', fontSize: chartFont(10) },
+        /* 正式环境反馈：数据点多的周期（近一年）下顶部数值标签互相重叠遮挡；
+           与 pc 项目一致改为不显示，数值走 tooltip */
+        label: { show: false },
         areaStyle: {
           color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
             { offset: 0, color: 'rgba(64,224,255,0.4)' },
@@ -436,7 +438,8 @@ const updateCityChart = () => {
           borderRadius: [2, 2, 0, 0]
         },
         barWidth: 12,
-        label: { show: true, position: 'top', color: '#bfe6ff', fontSize: chartFont(10) }
+        /* 正式环境反馈：12 个盟市的柱顶数值标签互相重叠遮挡；与 pc 一致改为不显示 */
+        label: { show: false }
       }
     ]
   }, true)

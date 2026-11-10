@@ -164,12 +164,14 @@ const coverageDetails = computed(() => {
 
   return {
     township: {
-      summary: `已覆盖 ${township.covered.toLocaleString()} / 总数 ${township.total.toLocaleString()}`,
+      /* 紧凑格式（正式环境反馈）：面板文字列仅约 96px，
+         「已覆盖 78 / 总数 79」长格式会被右边缘裁断 */
+      summary: `已覆盖 ${township.covered.toLocaleString()}/${township.total.toLocaleString()}`,
       rate: `覆盖率 ${townshipRate.toFixed(2)}%`,
       rateText: `${townshipRate.toFixed(2)}%`
     },
     village: {
-      summary: `已覆盖 ${village.covered.toLocaleString()} / 总数 ${village.total.toLocaleString()}`,
+      summary: `已覆盖 ${village.covered.toLocaleString()}/${village.total.toLocaleString()}`,
       rate: `覆盖率 ${villageRate.toFixed(2)}%`,
       rateText: `${villageRate.toFixed(2)}%`
     }

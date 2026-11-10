@@ -427,6 +427,53 @@ body {
   border-color: rgba(90, 150, 230, 0.5);
 }
 
+/* 下拉弹层深色主题（正式环境反馈：select 默认白底与深色大屏不搭、圆角箭头突兀）：
+   统一冷蓝配色，与 tooltip 同一套视觉 */
+.el-select__popper.el-popper,
+.el-cascader__popper.el-popper {
+  background: rgba(10, 26, 58, 0.96) !important;
+  border: 1px solid rgba(90, 150, 230, 0.5) !important;
+  border-radius: calc(4px * var(--screen-scale)) !important;
+}
+
+.el-select__popper .el-popper__arrow::before,
+.el-cascader__popper .el-popper__arrow::before {
+  background: rgba(10, 26, 58, 0.96);
+  border: 1px solid rgba(90, 150, 230, 0.5);
+}
+
+.el-select-dropdown,
+.el-cascader-panel {
+  background: transparent;
+}
+
+.el-select-dropdown__item {
+  color: #c8d6f5;
+}
+
+.el-select-dropdown__item.is-hovering,
+.el-select-dropdown__item:hover {
+  background: rgba(64, 158, 255, 0.18);
+  color: #ffffff;
+}
+
+.el-select-dropdown__item.is-selected {
+  color: #40e0ff;
+  font-weight: bold;
+}
+
+/* 弹层箭头与圆角按大屏缩放归一：页面在 .screen-wrapper 里被整体缩小后，
+   固定像素的箭头/圆角相对页面会显得巨大（正式环境 Windows 下尤其明显） */
+.el-popper__arrow,
+.el-popper__arrow::before {
+  width: calc(14px * var(--screen-scale));
+  height: calc(14px * var(--screen-scale));
+}
+
+.el-popper {
+  border-radius: calc(4px * var(--screen-scale));
+}
+
 /* ===== 浮层归一：跟随大屏缩放 =====
  * 页面全部内容在 .screen-wrapper 里 transform: scale(--screen-scale)，
  * 但 Element Plus 的下拉、tooltip、弹窗、全局消息都 teleport 到 body，
