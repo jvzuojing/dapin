@@ -64,13 +64,26 @@ body {
   --font-text: 'Source Han Sans SC', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif;
   --font-num: 'D-Din', 'DIN Alternate', 'DIN', 'Consolas', 'Courier New', monospace;
 
-  --f-title: 28px;
-  --f-panel-title: 16px;
-  --f-value-lg: 22px;
-  --f-value-md: 18px;
-  --f-label: 13px;
-  --f-text: 13px;
-  --f-small: 12px;
+  /* 字号放大系数：与 src/config/typography.ts 的 FONT_BOOST 保持一致。
+     小字提升最多（解决大屏上「字太小」），大数字小幅提升以免撑破卡片。 */
+  --font-boost-sm: 1.28;
+  --font-boost-md: 1.2;
+  --font-boost-lg: 1.12;
+  /* 画布缩放比例：App.vue 在初始化 / resize 时写入，用于归一 body 级浮层 */
+  --screen-scale: 1;
+  /* 浮层字号 / 行高 / 内边距：与页面正文完全同比（--screen-scale），无下限，
+     保证浮层和页面文字视觉大小一致（页面本身也没有下限） */
+  --popper-fs: calc(calc(13px * var(--font-boost-sm)) * var(--screen-scale));
+  --popper-row: calc(32px * var(--screen-scale));
+  --popper-pad: calc(12px * var(--screen-scale));
+
+  --f-title: calc(28px * var(--font-boost-lg));
+  --f-panel-title: calc(16px * var(--font-boost-md));
+  --f-value-lg: calc(22px * var(--font-boost-lg));
+  --f-value-md: calc(18px * var(--font-boost-md));
+  --f-label: calc(13px * var(--font-boost-sm));
+  --f-text: calc(13px * var(--font-boost-sm));
+  --f-small: calc(12px * var(--font-boost-sm));
 
   --gap-panel: 12px;
   --gap-card: 8px;
@@ -81,7 +94,7 @@ body {
 /* ===== 板块容器：细线边框 + 四角 L 形角标 + 顶部中央高光 ===== */
 .panel {
   position: relative;
-  border: 1px solid rgba(189, 212, 255, 0.16);
+  border: 1px solid rgba(189, 212, 255, 0.2);
   border-radius: 2px;
   padding: var(--pad-panel);
   display: flex;
@@ -94,7 +107,7 @@ body {
     /* 主体冷蓝玻璃 */
     linear-gradient(180deg, rgba(24, 42, 74, 0.42) 0%, rgba(9, 17, 32, 0.3) 100%),
     /* 顶部中央高光细线 */
-    linear-gradient(90deg, transparent, rgba(189, 212, 255, 0.85), transparent),
+    linear-gradient(90deg, transparent, rgba(189, 212, 255, 0.9), transparent),
     /* 四角 L 形角标：横向 */
     linear-gradient(90deg, var(--c-corner), transparent),
     linear-gradient(270deg, var(--c-corner), transparent),
@@ -112,11 +125,11 @@ body {
     0 0, 100% 0, 0 100%, 100% 100%;
   background-size:
     100% 100%,
-    26% 1px,
-    14px 1px, 14px 1px, 14px 1px, 14px 1px,
-    1px 14px, 1px 14px, 1px 14px, 1px 14px;
+    32% 1px,
+    16px 1px, 16px 1px, 16px 1px, 16px 1px,
+    1px 16px, 1px 16px, 1px 16px, 1px 16px;
   background-repeat: no-repeat;
-  box-shadow: inset 0 0 26px rgba(73, 166, 255, 0.06), 0 0 10px rgba(0, 0, 0, 0.16);
+  box-shadow: inset 0 0 30px rgba(73, 166, 255, 0.07), 0 0 12px rgba(0, 0, 0, 0.18);
 }
 
 /* 底边中央一条极淡的收口线 */
@@ -393,9 +406,10 @@ body {
 
 .el-popper.is-dark,
 .cell-full-tip.el-popper.is-dark {
-  max-width: 360px !important;
-  font-size: 13px;
+  max-width: calc(calc(360px * var(--font-boost-sm)) * var(--screen-scale)) !important;
+  font-size: var(--popper-fs);
   line-height: 1.6;
+  padding: calc(8px * var(--screen-scale)) var(--popper-pad);
   white-space: normal !important;
   word-break: break-word !important;
 }
@@ -411,4 +425,59 @@ body {
 .cell-full-tip.el-popper.is-dark .el-popper__arrow::before {
   background: rgba(10, 26, 58, 0.96);
   border-color: rgba(90, 150, 230, 0.5);
+}
+
+/* ===== 浮层归一：跟随大屏缩放 =====
+ * 页面全部内容在 .screen-wrapper 里 transform: scale(--screen-scale)，
+ * 但 Element Plus 的下拉、tooltip、弹窗、全局消息都 teleport 到 body，
+ * 不参与缩放，小视口下会比页面文字大 2~3 倍、且占掉半屏。
+ * 这里按同一比例归一：字号与页面正文一致，行高/内边距按缩放同步收紧；
+ * 弹窗和全局消息用 zoom 整体缩放（含内部表格、图标），保持居中不受影响。 */
+.el-select-dropdown,
+.el-select-dropdown__item,
+.el-cascader-node,
+.el-picker-panel,
+.el-popper:not(.is-dark) {
+  font-size: var(--popper-fs);
+}
+
+.el-select-dropdown__item,
+.el-cascader-node {
+  /* flex 居中，避免 Element Plus 默认 34px 行高在小尺寸下把文字挤出选项行 */
+  display: flex;
+  align-items: center;
+  height: var(--popper-row);
+  line-height: 1.2;
+  padding: 0 var(--popper-pad);
+  white-space: nowrap;
+}
+
+.el-select-dropdown__list {
+  padding: calc(6px * var(--screen-scale)) 0;
+}
+
+/* 弹窗 / 全局提示整体等比缩放，与页面完全同比（正常大小） */
+.el-dialog {
+  zoom: var(--screen-scale);
+}
+
+.el-message,
+.el-notification {
+  zoom: var(--screen-scale);
+}
+
+/* 页面表格：整体放大一档，但列头与单元格强制单行，避免窄列里换行把行高顶开 */
+.el-table {
+  font-size: calc(11px * var(--font-boost-sm));
+}
+
+.el-table .el-table__cell .cell {
+  line-height: 1.35;
+  white-space: nowrap;
+}
+
+.el-table th.el-table__cell .cell {
+  font-size: calc(10px * var(--font-boost-sm));
+  padding-left: 2px;
+  padding-right: 2px;
 }

@@ -188,6 +188,7 @@
 </template>
 
 <script setup lang="ts">
+import { chartFont } from '../config/typography'
 import { ref, computed, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
 import * as echarts from 'echarts'
 import 'echarts-wordcloud'
@@ -488,7 +489,7 @@ const updateDistribution = () => {
     legend: {
       show: multiSeries,
       data: distribution.series.map((item) => item.name),
-      textStyle: { color: '#7a93c4', fontSize: 13 },
+      textStyle: { color: '#7a93c4', fontSize: chartFont(13) },
       top: 0,
       right: 0,
       itemWidth: 12,
@@ -519,7 +520,7 @@ const updateDistribution = () => {
       axisLine: { lineStyle: { color: 'rgba(64,158,255,0.2)' } },
       axisLabel: {
         color: '#7a93c4',
-        fontSize: 12,
+        fontSize: chartFont(12),
         margin: 8,
         formatter: (value: number) => formatAxisCount(value)
       },
@@ -534,7 +535,7 @@ const updateDistribution = () => {
       axisTick: { show: false },
       axisLabel: {
         color: '#7a93c4',
-        fontSize: 12,
+        fontSize: chartFont(12),
         margin: 10,
         rotate: 0,
         align: 'right',
@@ -562,7 +563,7 @@ const updateDistribution = () => {
         show: !multiSeries,
         position: 'right',
         color: series.color[1],
-        fontSize: 12,
+        fontSize: chartFont(12),
         distance: 4
       }
     }))
@@ -610,7 +611,7 @@ const updateEntityTrend = () => {
     },
     legend: {
       data: SHOW_COMPLETION_TREND ? ['基层治理量', '完善率'] : ['基层治理量'],
-      textStyle: { color: '#7a93c4', fontSize: 13 },
+      textStyle: { color: '#7a93c4', fontSize: chartFont(13) },
       top: 0,
       left: 'center',
       itemGap: 20,
@@ -624,7 +625,7 @@ const updateEntityTrend = () => {
       axisLine: { lineStyle: { color: 'rgba(64,158,255,0.2)' } },
       axisLabel: {
         color: '#7a93c4',
-        fontSize: 11,
+        fontSize: chartFont(11),
         interval: 0,
         rotate: 26,
         margin: 6,
@@ -635,7 +636,7 @@ const updateEntityTrend = () => {
       {
         type: 'value',
         axisLine: { show: false },
-        axisLabel: { color: '#7a93c4', fontSize: 12, formatter: (value: number) => formatAxisCount(value) },
+        axisLabel: { color: '#7a93c4', fontSize: chartFont(12), formatter: (value: number) => formatAxisCount(value) },
         splitLine: { lineStyle: { color: 'rgba(64,158,255,0.08)' } }
       },
       ...(SHOW_COMPLETION_TREND
@@ -644,7 +645,7 @@ const updateEntityTrend = () => {
             min: 0,
             max: percentAxisMax,
             axisLine: { show: false },
-            axisLabel: { color: '#7a93c4', fontSize: 12, formatter: '{value}%' },
+            axisLabel: { color: '#7a93c4', fontSize: chartFont(12), formatter: '{value}%' },
             splitLine: { show: false }
           }]
         : [])
@@ -759,7 +760,7 @@ const updateWordCloud = () => {
         type: 'text',
         left: 'center',
         top: 'middle',
-        style: { text: '暂无数据', fill: '#7a93c4', fontSize: 12 }
+        style: { text: '暂无数据', fill: '#7a93c4', fontSize: chartFont(12) }
       }]
     }, true)
     return
@@ -769,7 +770,7 @@ const updateWordCloud = () => {
     tooltip: { trigger: 'item', formatter: '{b}: {c}' },
     title: entityPieConfig.value.titles.map(item => ({
       ...item,
-      textStyle: { color: '#7a93c4', fontSize: 12, fontWeight: 'normal' }
+      textStyle: { color: '#7a93c4', fontSize: chartFont(12), fontWeight: 'normal' }
     })),
     graphic: [],
     series: entityPieConfig.value.series.map((series, index) => ({
@@ -780,7 +781,7 @@ const updateWordCloud = () => {
       avoidLabelOverlap: true,
       label: {
         color: '#7a93c4',
-        fontSize: 10,
+        fontSize: chartFont(10),
         formatter: '{b}'
       },
       labelLine: {
@@ -906,13 +907,13 @@ onBeforeUnmount(() => {
 }
 
 .rc-label {
-  font-size: 13px;
+  font-size: calc(13px * var(--font-boost-sm));
   color: var(--c-text, #c8d6f5);
   line-height: 1.3;
 }
 
 .rc-value {
-  font-size: 19px;
+  font-size: calc(19px * var(--font-boost-md));
   font-weight: bold;
   color: var(--c-cyan, #40e0ff);
   font-family: 'DIN', 'Consolas', monospace;
@@ -922,7 +923,7 @@ onBeforeUnmount(() => {
 
 /* 数据总量等长数字（如 178,410,879）自动缩字号，避免溢出卡片 */
 .rc-value-long {
-  font-size: 14px;
+  font-size: calc(14px * var(--font-boost-md));
   letter-spacing: -0.2px;
 }
 
@@ -936,7 +937,7 @@ onBeforeUnmount(() => {
   display: inline-block;
   margin-left: 4px;
   color: #40e0ff;
-  font-size: 12px;
+  font-size: calc(12px * var(--font-boost-sm));
 }
 
 .report-card.clickable {
@@ -997,7 +998,7 @@ onBeforeUnmount(() => {
 }
 
 .entity-info .stat-card .value {
-  font-size: 18px;
+  font-size: calc(18px * var(--font-boost-md));
 }
 
 .entity-charts {
@@ -1037,7 +1038,7 @@ onBeforeUnmount(() => {
 }
 
 .page-total {
-  font-size: 12px;
+  font-size: calc(12px * var(--font-boost-sm));
   color: var(--c-text, #c8d6f5);
 }
 
@@ -1069,7 +1070,7 @@ onBeforeUnmount(() => {
   margin-top: 2px;
   padding: 1px 6px;
   border-radius: 2px;
-  font-size: 10px;
+  font-size: calc(10px * var(--font-boost-sm));
   color: #fff;
   background: #c2417a;
 }
@@ -1094,7 +1095,7 @@ onBeforeUnmount(() => {
   display: inline-block;
   padding: 2px 8px;
   border-radius: 2px;
-  font-size: 11px;
+  font-size: calc(11px * var(--font-boost-sm));
 }
 
 .status-green {

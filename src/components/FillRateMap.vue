@@ -5,6 +5,7 @@
 </template>
 
 <script setup lang="ts">
+import { chartFont } from '../config/typography'
 import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import * as echarts from 'echarts'
 import 'echarts-gl'
@@ -322,11 +323,15 @@ const buildOption = () => {
   })
 
   // 两层必须共用同一份 viewControl，否则拖拽/缩放后事件层会和视觉层错位
+  // 居中校准：透视相机（alpha=50）下地图投影的视觉中心实测比画布几何中心
+  // 偏左约 75px、偏下约 90px（6654×1152 设计坐标）。把视线目标反向微移，
+  // 让地图回到画布正中。单位是地图盒坐标（boxWidth=100 ≈ 画布 1624px，
+  // 即 1 单位 ≈ 16px；y 轴受 50° 俯角透视压缩再除以 cos50° ≈ 0.64）
   const viewControl = {
     alpha: 50,
     beta: 0,
     distance,
-    center: [0, 0, 0],
+    center: [-4.7, -11.9, 0],
     autoRotate: false,
     damping: 0.88,
     minDistance: 26,
@@ -358,7 +363,7 @@ const buildOption = () => {
           borderWidth: 2,
           borderColor: 'rgba(230,252,255,.95)'
         },
-        label: { show: true, color: '#ffffff', fontSize: 21, fontWeight: 700 }
+        label: { show: true, color: '#ffffff', fontSize: chartFont(21), fontWeight: 700 }
       },
       label: {
         show: true,

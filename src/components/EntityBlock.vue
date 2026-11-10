@@ -1,10 +1,12 @@
 <template>
   <div class="entity-block">
+    <!-- 验收反馈：改成上下布局（标题一行、统计一行），统计数字放大突出 -->
     <div class="block-header">
-      <span class="block-total">治理总数 {{ total }}</span>
-      <span class="block-title">{{ title }}</span>
-      <span v-if="tagTotal" class="block-total">标签总数 {{ tagTotal }}</span>
-      <span v-else class="block-total placeholder"></span>
+      <div class="block-title">{{ title }}</div>
+      <div class="block-stats">
+        <span class="block-stat">治理总数 <b>{{ total }}</b></span>
+        <span v-if="tagTotal" class="block-stat">标签总数 <b>{{ tagTotal }}</b></span>
+      </div>
     </div>
     <div class="block-body">
       <div class="block-main">
@@ -32,7 +34,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
+import { chartFont } from '../config/typography'
+import { ref, computed, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
 import * as echarts from 'echarts'
 import 'echarts-wordcloud'
 
@@ -65,7 +68,11 @@ const props = withDefaults(defineProps<{
   empty: false
 })
 
-const rightMode = props.cloudWords.length ? 'wordcloud' : (props.donuts.length ? 'donut' : 'none')
+/** 右侧内容模式：必须是 computed —— 接口模式下首帧数据为空，
+ *  数据回填后才能从 none 切到 wordcloud / donut 并触发渲染 */
+const rightMode = computed<'wordcloud' | 'donut' | 'none'>(() =>
+  props.cloudWords.length ? 'wordcloud' : (props.donuts.length ? 'donut' : 'none')
+)
 
 const dpr = window.devicePixelRatio || 1
 const trendRef = ref<HTMLElement | null>(null)
@@ -99,7 +106,7 @@ const renderTrend = () => {
     },
     legend: {
       data: ['基层治理量'],
-      textStyle: { color: '#a9c8f5', fontSize: 12 },
+      textStyle: { color: '#a9c8f5', fontSize: chartFont(12) },
       top: 0,
       left: 'center',
       itemWidth: 10,
@@ -112,14 +119,14 @@ const renderTrend = () => {
       axisLine: { lineStyle: { color: 'rgba(64,158,255,0.2)' } },
       axisTick: { alignWithLabel: true, lineStyle: { color: 'rgba(64,158,255,0.25)' } },
       axisLabel: {
-        color: '#cfe4ff', fontSize: 11, lineHeight: 13, interval: 0, rotate: 0, margin: 8,
+        color: '#cfe4ff', fontSize: chartFont(11), lineHeight: 15, interval: 0, rotate: 0, margin: 8,
         formatter: (v: string) => axisLabelText(v)
       }
     },
     yAxis: {
       type: 'value',
       axisLine: { show: false },
-      axisLabel: { color: '#9ab9e6', fontSize: 11 },
+      axisLabel: { color: '#9ab9e6', fontSize: chartFont(11) },
       splitLine: { lineStyle: { color: 'rgba(64,158,255,0.08)' } }
     },
     series: [{
@@ -181,7 +188,7 @@ const renderDonuts = () => {
         radius: ['42%', '68%'],
         label: {
           color: '#7a93c4',
-          fontSize: 10,
+          fontSize: chartFont(10),
           formatter: '{b}\n{c}'
         },
         labelLine: { length: 6, length2: 6, lineStyle: { color: 'rgba(64,158,255,0.3)' } },
@@ -194,17 +201,20 @@ const renderDonuts = () => {
 
 const renderAll = () => {
   renderTrend()
-  if (rightMode === 'wordcloud') renderCloud()
-  if (rightMode === 'donut') renderDonuts()
+  if (rightMode.value === 'wordcloud') {
+    // 词云图懒初始化：接口模式下首帧可能没有 cloudRef（v-if 未渲染）
+    if (!cloudChart && cloudRef.value) {
+      cloudChart = echarts.init(cloudRef.value, undefined, { devicePixelRatio: dpr })
+    }
+    renderCloud()
+  }
+  if (rightMode.value === 'donut') renderDonuts()
 }
 
 onMounted(() => {
   nextTick(() => {
     if (trendRef.value) {
       trendChart = echarts.init(trendRef.value, undefined, { devicePixelRatio: dpr })
-    }
-    if (rightMode === 'wordcloud' && cloudRef.value) {
-      cloudChart = echarts.init(cloudRef.value, undefined, { devicePixelRatio: dpr })
     }
     renderAll()
     ro = new ResizeObserver(() => {
@@ -213,6 +223,7 @@ onMounted(() => {
       donutCharts.forEach((c) => c?.resize())
     })
     if (trendRef.value) ro.observe(trendRef.value)
+    if (cloudRef.value) ro.observe(cloudRef.value)
   })
 })
 
@@ -222,6 +233,13 @@ onBeforeUnmount(() => {
   cloudChart?.dispose()
   donutCharts.forEach((c) => c?.dispose())
 })
+
+/** 接口数据回填 / 区划切换后重渲染（rightMode 也可能随之切换） */
+watch(
+  () => [props.axisLabels, props.trend, props.rates, props.donuts, props.cloudWords],
+  () => nextTick(renderAll),
+  { deep: true }
+)
 
 defineExpose({ resize: () => {
   trendChart?.resize()
@@ -242,32 +260,49 @@ defineExpose({ resize: () => {
   padding: 4px 6px 2px;
 }
 
+/* 上下布局：标题在上、统计数字在下，数字更醒目 */
 .block-header {
   flex: 0 0 auto;
   display: flex;
+  flex-direction: column;
   align-items: center;
-  justify-content: space-between;
-  gap: 8px;
+  gap: 2px;
+  padding-bottom: 2px;
 }
 
 .block-title {
-  font-size: 14px;
+  font-size: calc(15px * var(--font-boost-md));
   font-weight: bold;
   color: #40e0ff;
   letter-spacing: 1px;
+  line-height: 1.2;
 }
 
-.block-total {
-  flex: 0 0 auto;
-  font-size: 11px;
-  color: #cfe4ff;
+.block-stats {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+}
+
+.block-stat {
+  font-size: calc(12px * var(--font-boost-sm));
+  color: #bcd9ff;
   background: rgba(30, 50, 100, 0.5);
   border: 1px solid rgba(64, 158, 255, 0.3);
   border-radius: 3px;
-  padding: 2px 8px;
+  padding: 2px 10px;
+  white-space: nowrap;
 }
 
-.block-total.placeholder { visibility: hidden; }
+.block-stat b {
+  margin-left: 4px;
+  font-size: calc(18px * var(--font-boost-md));
+  color: #40e0ff;
+  font-family: 'DIN', 'Consolas', monospace;
+  font-weight: bold;
+}
 
 .block-body {
   flex: 1 1 auto;
@@ -294,7 +329,7 @@ defineExpose({ resize: () => {
 .chart-caption {
   flex: 0 0 auto;
   text-align: center;
-  font-size: 12px;
+  font-size: calc(12px * var(--font-boost-sm));
   font-weight: 500;
   line-height: 15px;
   color: #cfe4ff;
@@ -330,7 +365,7 @@ defineExpose({ resize: () => {
 .donut-title {
   flex: 0 0 auto;
   text-align: center;
-  font-size: 12px;
+  font-size: calc(12px * var(--font-boost-sm));
   color: #bcd9ff;
   padding-top: 2px;
 }

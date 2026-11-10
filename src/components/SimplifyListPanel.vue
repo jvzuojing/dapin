@@ -4,33 +4,38 @@
       <span class="panel-title-text">基层精简保留清单</span>
     </div>
 
-    <div class="kpi-row">
-      <div class="kpi-card">
-        <div class="kpi-value">{{ view.ledgerCount }}<small>张</small></div>
-        <div class="kpi-label">基层扩底表</div>
+    <!-- 验收反馈：顶部统计数据 + 饼状图共占 50%，下面列表占 50% -->
+    <div class="simplify-top">
+      <div class="kpi-row">
+        <div class="kpi-card">
+          <div class="kpi-value">{{ view.ledgerCount }}<small>张</small></div>
+          <div class="kpi-label">基层扩底表</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-value">{{ view.dataCount }}<small>{{ view.dataUnit }}</small></div>
+          <div class="kpi-label">累计填报数据</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-value">{{ view.issueCount }}</div>
+          <div class="kpi-label">涉及下发部门总数</div>
+        </div>
       </div>
-      <div class="kpi-card">
-        <div class="kpi-value">{{ view.dataCount }}<small>{{ view.dataUnit }}</small></div>
-        <div class="kpi-label">累计填报数据</div>
-      </div>
-      <div class="kpi-card">
-        <div class="kpi-value">{{ view.issueCount }}</div>
-        <div class="kpi-label">涉及下发部门总数</div>
+
+      <div class="mid-row">
+        <!-- 部门口径应为「报表归属部门」，接口目前给的是报表创建部门，暂时隐藏此图 -->
+        <div v-if="SHOW_DEPT_BAR" class="mid-left">
+          <div class="sec-title">数据报表分布情况</div>
+          <div ref="barRef" class="chart-bar"></div>
+        </div>
+        <div class="mid-right">
+          <div class="sec-title">按频率统计</div>
+          <div ref="donutRef" class="chart-donut"></div>
+        </div>
       </div>
     </div>
 
-    <div class="mid-row">
-      <div class="mid-left">
-        <div class="sec-title">数据报表分布情况</div>
-        <div ref="barRef" class="chart-bar"></div>
-      </div>
-      <div class="mid-right">
-        <div class="sec-title">按频率统计</div>
-        <div ref="donutRef" class="chart-donut"></div>
-      </div>
-    </div>
-
-    <el-table :data="view.tableData" size="small" class="list-table" height="322">
+    <div ref="tableHost" class="simplify-bottom">
+    <el-table :data="view.tableData" size="small" class="list-table" height="100%">
       <el-table-column type="index" label="序号" width="42" align="center" show-overflow-tooltip />
       <el-table-column prop="name" label="数据表名称" min-width="140">
         <template #default="{ row }">
@@ -50,14 +55,20 @@
       <el-table-column prop="dataTotal" label="数据量" width="62" align="center" show-overflow-tooltip />
       <el-table-column prop="date" label="发布时间" width="100" align="center" show-overflow-tooltip />
     </el-table>
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
+import { chartFont } from '../config/typography'
 import { computed, onMounted, onBeforeUnmount, ref, watch } from 'vue'
 import * as echarts from 'echarts'
 import { useDashboardApi } from '../composables/useDashboardApi'
 import type { FillCountVO } from '../types/api'
+import { useTableAutoScroll } from '../composables/useTableAutoScroll'
+
+/** 部门分布口径应为「报表归属部门」，接口目前返回的是创建部门；按验收反馈暂时隐藏该图 */
+const SHOW_DEPT_BAR = false
 
 /** 接口数据（getFillCount，isExtended=true）；未取到时降级为演示数据 */
 const { simplifyFillCount } = useDashboardApi()
@@ -173,7 +184,7 @@ const renderCharts = () => {
         ],
         xAxis: {
           type: 'value',
-          axisLabel: { color: '#7a93c4', fontSize: 10, formatter: '{value}张' },
+          axisLabel: { color: '#7a93c4', fontSize: chartFont(10), formatter: '{value}张' },
           splitLine: { lineStyle: { color: 'rgba(64,158,255,0.08)' } }
         },
         yAxis: {
@@ -183,7 +194,7 @@ const renderCharts = () => {
           axisLine: { lineStyle: { color: 'rgba(64,158,255,0.2)' } },
           axisTick: { show: false },
           axisLabel: {
-            color: '#a9c8f5', fontSize: 11, width: 96, margin: 10,
+            color: '#a9c8f5', fontSize: chartFont(11, true), width: 96, margin: 10,
             overflow: 'truncate', rotate: 20,
             formatter: (v: string) => clipLabel(v)
           }
@@ -200,7 +211,7 @@ const renderCharts = () => {
               borderRadius: [0, 3, 3, 0]
             },
             barMaxWidth: 9,
-            label: { show: true, position: 'right', color: '#40e0ff', fontSize: 10, formatter: '{c}' }
+            label: { show: true, position: 'right', color: '#40e0ff', fontSize: chartFont(10), formatter: '{c}' }
           }
         ]
       },
@@ -217,7 +228,7 @@ const renderCharts = () => {
             type: 'pie',
             center: ['50%', '50%'],
             radius: ['40%', '66%'],
-            label: { color: '#7a93c4', fontSize: 10, formatter: '{b}\n{c}' },
+            label: { color: '#7a93c4', fontSize: chartFont(10), formatter: '{b}\n{c}' },
             labelLine: { length: 5, length2: 5, lineStyle: { color: 'rgba(64,158,255,0.3)' } },
             itemStyle: { borderColor: 'rgba(8,16,38,0.95)', borderWidth: 2 },
             data: freqDist.map((d, i) => ({
@@ -249,6 +260,10 @@ onMounted(() => {
 })
 
 watch(view, () => renderCharts())
+
+/** 列表直接展示全量数据并自动滚动，鼠标移入暂停、移出继续 */
+const tableHost = ref<HTMLElement | null>(null)
+useTableAutoScroll(tableHost, () => view.value.tableData.length)
 
 onBeforeUnmount(() => {
   ro?.disconnect()
@@ -284,15 +299,28 @@ onBeforeUnmount(() => {
 }
 
 .kpi-value {
-  font-size: 19px;
+  font-size: calc(19px * var(--font-boost-md));
   font-weight: bold;
   color: #40e0ff;
   font-family: 'DIN', 'Consolas', monospace;
 }
 
-.kpi-value small { font-size: 12px; margin-left: 2px; }
+.kpi-value small { font-size: calc(12px * var(--font-boost-sm)); margin-left: 2px; }
 
-.kpi-label { margin-top: 2px; font-size: 11px; color: #c8d6f5; }
+.kpi-label { margin-top: 2px; font-size: calc(11px * var(--font-boost-sm)); color: #c8d6f5; }
+
+/* 上半：统计卡 + 饼图共 50%；下半：列表 50% */
+.simplify-top {
+  flex: 0 0 50%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.simplify-bottom {
+  flex: 1 1 0;
+  min-height: 0;
+}
 
 .mid-row {
   flex: 1 1 0;
@@ -318,7 +346,7 @@ onBeforeUnmount(() => {
 .sec-title {
   flex: 0 0 auto;
   text-align: center;
-  font-size: 13px;
+  font-size: calc(13px * var(--font-boost-sm));
   color: #40e0ff;
   letter-spacing: 2px;
   margin: 2px 0;
@@ -327,5 +355,5 @@ onBeforeUnmount(() => {
 .chart-bar { flex: 1 1 0; min-height: 0; }
 .chart-donut { flex: 1 1 0; min-height: 0; }
 
-.list-table { flex: 0 0 auto; }
+.list-table { height: 100%; }
 </style>

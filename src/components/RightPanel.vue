@@ -1,12 +1,8 @@
 <template>
   <div class="right-panel-root">
     <!-- 系统使用情况：按设计稿三块同屏展示（访问走势 / 地区情况 / 部门访问列表） -->
-    <div
-      v-loading="rightTopLoading"
-      element-loading-text="系统使用情况加载中..."
-      element-loading-background="rgba(3, 10, 28, 0.38)"
-      class="right-top panel"
-    >
+    <!-- 不加 loading 遮罩：接口排队/失败时保留演示数据，避免遮罩常驻压在图表上 -->
+    <div class="right-top panel">
       <div class="panel-title">
         <span class="panel-title-text">系统使用情况</span>
       </div>
@@ -21,7 +17,6 @@
           <span class="sys-value">{{ systemUsageAll.dailyActive }}</span>
         </div>
         <el-select v-model="queryPeriod" class="period-select" size="small" placeholder="查询周期">
-          <el-option label="查询周期" value="" disabled />
           <el-option label="近一周" value="week" />
           <el-option label="近一个月" value="month" />
           <el-option label="近一季度" value="quarter" />
@@ -78,15 +73,63 @@
         <span class="panel-title-text">数据使用情况</span>
       </div>
 
-      <!-- 场景详情弹窗入口暂时屏蔽，恢复时加回：class="usage-block clickable-scene" title="点击查看场景详情" @click="showSceneDialog = true" -->
-      <div class="usage-block">
-        <div class="usage-header">
+      <!-- 精简情况（原型新增）：左报表流 + 中预填率 + 右字段流 -->
+      <section class="usage-section simplify-section">
+        <div class="usage-section-head">
+          <span class="usage-subtitle">精简情况</span>
+          <span class="usage-head-tag">精简成效</span>
+        </div>
+        <div class="simplify-grid">
+          <div class="simplify-flow">
+            <div class="simplify-stat is-before">
+              <span class="ss-stage">精简前</span>
+              <span class="ss-value">{{ simplifyOverview.report.before }}</span>
+              <span class="ss-unit">{{ simplifyOverview.report.unit }}</span>
+            </div>
+            <div class="simplify-arrow"></div>
+            <div class="simplify-stat is-after">
+              <span class="ss-stage">精简后</span>
+              <span class="ss-value">{{ simplifyOverview.report.after }}</span>
+              <span class="ss-unit">{{ simplifyOverview.report.unit }}</span>
+            </div>
+          </div>
+
+          <div class="simplify-rate">
+            <div class="sr-title">{{ simplifyOverview.prefill.title }}</div>
+            <div class="sr-ring" :style="{ '--rate-deg': `${prefillDeg}deg` }">
+              <div class="sr-ring-inner">
+                <span class="sr-value">{{ simplifyOverview.prefill.rate.toFixed(2) }}<small>%</small></span>
+                <span class="sr-caption">预填率</span>
+              </div>
+            </div>
+            <div class="sr-formula">
+              {{ simplifyOverview.prefill.numerator }} / {{ simplifyOverview.prefill.denominator }}
+              = {{ simplifyOverview.prefill.rate.toFixed(2) }}%
+            </div>
+          </div>
+
+          <div class="simplify-flow">
+            <div class="simplify-stat is-before">
+              <span class="ss-stage">精简前</span>
+              <span class="ss-value">{{ simplifyOverview.field.before }}</span>
+              <span class="ss-unit">{{ simplifyOverview.field.unit }}</span>
+            </div>
+            <div class="simplify-arrow"></div>
+            <div class="simplify-stat is-after">
+              <span class="ss-stage">精简后</span>
+              <span class="ss-value">{{ simplifyOverview.field.after }}</span>
+              <span class="ss-unit">{{ simplifyOverview.field.unit }}</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 场景详情弹窗入口暂时屏蔽，恢复时加回：class="usage-section clickable-scene" title="点击查看场景详情" @click="showSceneDialog = true" -->
+      <section class="usage-section scene-section">
+        <div class="usage-section-head scene-band">
           <span class="usage-label">基层特色场景：</span>
           <span class="usage-num">{{ sceneCount }}个</span>
         </div>
-      </div>
-
-      <div class="usage-block scene-bubbles-block">
         <div class="scene-bubbles">
           <div class="scene-bubble bubble-base">
             <div class="bubble-value">{{ sceneData.baseScenes.length }}个</div>
@@ -101,10 +144,10 @@
             <div class="bubble-label">其他场景</div>
           </div>
         </div>
-      </div>
+      </section>
 
-      <div class="usage-block">
-        <div class="usage-header">
+      <section class="usage-section">
+        <div class="usage-section-head">
           <span class="usage-subtitle">"一表通根数据库"情况</span>
         </div>
         <div class="db-nodes">
@@ -121,10 +164,10 @@
             <div class="db-node-label">数据</div>
           </div>
         </div>
-      </div>
+      </section>
 
-      <div class="usage-block">
-        <div class="usage-header">
+      <section class="usage-section">
+        <div class="usage-section-head">
           <span class="usage-subtitle">回流情况</span>
         </div>
         <div class="backflow-list">
@@ -133,10 +176,10 @@
             <div class="bf-value">{{ item.value }}</div>
           </div>
         </div>
-      </div>
+      </section>
 
-      <div class="usage-block usage-block-last">
-        <div class="usage-header">
+      <section class="usage-section">
+        <div class="usage-section-head">
           <span class="usage-subtitle">政法委系统对接情况</span>
         </div>
         <div class="zf-cards">
@@ -165,7 +208,7 @@
             </div>
           </div>
         </div>
-      </div>
+      </section>
     </div>
 
     <el-dialog
@@ -260,12 +303,13 @@
 </template>
 
 <script setup lang="ts">
+import { chartFont } from '../config/typography'
 import { ref, computed, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
 import * as echarts from 'echarts'
 import { useScaledData, useRegionData } from '../composables/useRegionData'
 import { useDashboardApi } from '../composables/useDashboardApi'
 
-const { systemUsageAll, systemUsageCity, systemUsageDept, rootDatabase, backflowData, politicalLegalData, sceneData } = useScaledData()
+const { systemUsageAll, systemUsageCity, systemUsageDept, rootDatabase, simplifyOverview, backflowData, politicalLegalData, sceneData } = useScaledData()
 const { selectedRegion, scaleVersion } = useRegionData()
 const { setAccessTimeType, loadAccessList, accessRegionList, accessDeptList, globalDataLoading, accessTimeLoading, reportStats } = useDashboardApi()
 
@@ -281,8 +325,6 @@ watch(showDeptDialog, (visible) => {
   if (visible && !accessDeptList.value) loadAccessList('dept')
 })
 
-const rightTopLoading = computed(() => globalDataLoading.value || accessTimeLoading.value)
-
 /** 三块同屏后，地区/部门明细在挂载时一次取回，不再依赖 tab 点击 */
 const loadSysDetails = () => {
   loadAccessList('region')
@@ -294,9 +336,13 @@ const sceneCount = computed(() =>
   sceneData.value.baseScenes.length + sceneData.value.extendScenes.length + sceneData.value.otherScenes.length
 )
 
-const shortenAxisLabel = (label: string, max = 6) => (
-  label.length > max ? `${label.slice(0, max)}...` : label
+/** 预填率圆环的扇形角度（0~360） */
+const prefillDeg = computed(() =>
+  Math.min(360, Math.max(0, simplifyOverview.value.prefill.rate * 3.6))
 )
+
+/** 地区情况柱图 12 根柱子挤在窄列里，刻度取前两字避免斜排互相压住；悬停仍显示全称 */
+const shortCityLabel = (label: string) => label.slice(0, 2)
 
 /* ---------------- 访问走势折线 + 地区情况柱状（两块同屏） ---------------- */
 const trendChartRef = ref<HTMLElement | null>(null)
@@ -323,12 +369,12 @@ const updateTrendChart = () => {
       type: 'category',
       data: systemUsageAll.value.dates,
       axisLine: { lineStyle: { color: 'rgba(64,158,255,0.2)' } },
-      axisLabel: { color: '#7a93c4', fontSize: 11, margin: 6 }
+      axisLabel: { color: '#7a93c4', fontSize: chartFont(11), margin: 6 }
     },
     yAxis: {
       type: 'value',
       axisLine: { show: false },
-      axisLabel: { color: '#7a93c4', fontSize: 11, margin: 6 },
+      axisLabel: { color: '#7a93c4', fontSize: chartFont(11), margin: 6 },
       splitLine: { lineStyle: { color: 'rgba(64,158,255,0.08)' } }
     },
     series: [
@@ -341,7 +387,7 @@ const updateTrendChart = () => {
         lineStyle: { width: 2 },
         symbol: 'circle',
         symbolSize: 6,
-        label: { show: true, position: 'top', color: '#bfe6ff', fontSize: 10 },
+        label: { show: true, position: 'top', color: '#bfe6ff', fontSize: chartFont(10) },
         areaStyle: {
           color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
             { offset: 0, color: 'rgba(64,224,255,0.4)' },
@@ -357,24 +403,24 @@ const updateCityChart = () => {
   if (!cityChart) return
   cityChart.setOption({
     tooltip: { trigger: 'axis' },
-    grid: { top: 18, right: 14, bottom: 34, left: 40, containLabel: true },
+    grid: { top: 18, right: 14, bottom: 42, left: 40, containLabel: true },
     xAxis: {
       type: 'category',
       data: systemUsageCity.value.cities,
       axisLine: { lineStyle: { color: 'rgba(64,158,255,0.2)' } },
       axisLabel: {
-        color: '#7a93c4',
-        fontSize: 10,
+        color: '#a9c8f5',
+        fontSize: chartFont(10, true),
         interval: 0,
-        rotate: 28,
+        rotate: 20,
         margin: 6,
-        formatter: (value: string) => shortenAxisLabel(value, 4)
+        formatter: (value: string) => shortCityLabel(value)
       }
     },
     yAxis: {
       type: 'value',
       axisLine: { show: false },
-      axisLabel: { color: '#7a93c4', fontSize: 11, margin: 6 },
+      axisLabel: { color: '#7a93c4', fontSize: chartFont(11), margin: 6 },
       splitLine: { lineStyle: { color: 'rgba(64,158,255,0.08)' } }
     },
     series: [
@@ -390,7 +436,7 @@ const updateCityChart = () => {
           borderRadius: [2, 2, 0, 0]
         },
         barWidth: 12,
-        label: { show: true, position: 'top', color: '#bfe6ff', fontSize: 10 }
+        label: { show: true, position: 'top', color: '#bfe6ff', fontSize: chartFont(10) }
       }
     ]
   }, true)
@@ -502,6 +548,7 @@ onBeforeUnmount(() => {
   display: flex;
   flex-direction: column;
   justify-content: space-between;
+  gap: 8px;
   min-height: var(--right-bottom-min-height, 286px);
   overflow: hidden;
   padding-bottom: 8px;
@@ -531,12 +578,12 @@ onBeforeUnmount(() => {
 }
 
 .sys-label {
-  font-size: 11px;
+  font-size: calc(11px * var(--font-boost-sm));
   color: var(--c-text-dim, #7a93c4);
 }
 
 .sys-value {
-  font-size: 16px;
+  font-size: calc(16px * var(--font-boost-md));
   font-weight: bold;
   color: var(--c-cyan, #40e0ff);
   font-family: 'DIN', 'Consolas', monospace;
@@ -547,7 +594,7 @@ onBeforeUnmount(() => {
   border: none;
   background: transparent;
   color: #40e0ff;
-  font-size: 12px;
+  font-size: calc(12px * var(--font-boost-sm));
   cursor: pointer;
   padding: 0;
 }
@@ -556,20 +603,35 @@ onBeforeUnmount(() => {
   color: #7cecff;
 }
 
+/* 验收反馈：周期选择框太大。按原型改为一枚紧凑小胶囊，不再与统计卡等高 */
 .period-select {
-  width: 96px;
+  width: 74px;
   flex: 0 0 auto;
+  align-self: center;
 }
 
+/* Element Plus 2.14 的 select 根节点是 .el-select__wrapper（不再是 .el-input__wrapper） */
+.period-select :deep(.el-select__wrapper),
 .period-select :deep(.el-input__wrapper) {
-  background: rgba(30, 50, 100, 0.7) !important;
-  box-shadow: 0 0 0 1px var(--c-border, rgba(64, 158, 255, 0.25)) inset !important;
+  min-height: 22px !important;
+  padding: 0 6px !important;
+  border-radius: 11px !important;
+  background: #16305c !important;
+  box-shadow: 0 0 0 1px rgba(64, 158, 255, 0.45) inset !important;
 }
 
-.period-select :deep(.el-input__inner) {
-  color: #fff !important;
-  font-size: 12px !important;
+.period-select :deep(.el-input__inner),
+.period-select :deep(.el-select__placeholder),
+.period-select :deep(.el-select__selected-item) {
+  color: #cfe4ff !important;
+  -webkit-text-fill-color: #cfe4ff !important;
+  font-size: calc(11px * var(--font-boost-sm)) !important;
+  line-height: 22px !important;
 }
+
+.period-select :deep(.el-input__inner) { height: 22px !important; }
+.period-select :deep(.el-select__caret),
+.period-select :deep(.el-input__suffix) { color: #7fb2ff !important; min-height: 22px; }
 
 /* 三块同屏：按 flex 比例铺满整列，不再只显示一个 tab 图 */
 .sys-section {
@@ -594,7 +656,7 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  font-size: 13px;
+  font-size: calc(13px * var(--font-boost-sm));
   font-weight: 600;
   color: #8fd9ff;
   padding-left: 8px;
@@ -626,28 +688,28 @@ onBeforeUnmount(() => {
 }
 
 .dept-inline-label {
-  font-size: 10px;
+  font-size: calc(10px * var(--font-boost-sm));
   color: #7a93c4;
 }
 
 .dept-inline-value {
   margin-top: 2px;
   color: #40e0ff;
-  font-size: 17px;
+  font-size: calc(17px * var(--font-boost-md));
   font-weight: bold;
   font-family: 'DIN', 'Consolas', monospace;
   line-height: 1.1;
 }
 
 .dept-inline-wide .dept-inline-value {
-  font-size: 12px;
+  font-size: calc(12px * var(--font-boost-sm));
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
 .dept-inline-extra {
-  font-size: 10px;
+  font-size: calc(10px * var(--font-boost-sm));
   color: #7a93c4;
 }
 
@@ -665,7 +727,7 @@ onBeforeUnmount(() => {
   align-items: center;
   gap: 6px;
   padding: 2px 8px;
-  font-size: 11px;
+  font-size: calc(11px * var(--font-boost-sm));
   color: #cfe3ff;
   border-bottom: 1px solid rgba(64, 158, 255, 0.1);
   flex: 0 0 auto;
@@ -686,7 +748,7 @@ onBeforeUnmount(() => {
 .dept-inline-table .dept-rank {
   width: 19px;
   height: 19px;
-  font-size: 10px;
+  font-size: calc(10px * var(--font-boost-sm));
 }
 
 /* 基层特色场景三个圆形气泡 */
@@ -695,7 +757,7 @@ onBeforeUnmount(() => {
   align-items: center;
   justify-content: space-around;
   gap: 10px;
-  padding: 10px 6px 14px;
+  padding: 6px 6px 4px;
 }
 
 .scene-bubble {
@@ -730,46 +792,249 @@ onBeforeUnmount(() => {
 }
 
 .bubble-value {
-  font-size: 20px;
+  font-size: calc(20px * var(--font-boost-lg));
   font-weight: 700;
   font-family: 'DIN', 'Consolas', monospace;
   line-height: 1.1;
 }
 
 .bubble-label {
-  font-size: 12px;
+  font-size: calc(12px * var(--font-boost-sm));
   font-weight: 600;
   margin-top: 3px;
   white-space: nowrap;
 }
 
-/* 数据使用 */
-.usage-block {
-  padding: 2px 0;
-  border-bottom: 1px solid rgba(64, 158, 255, 0.12);
-  flex-shrink: 0;
-}
-
-.usage-block:last-child {
-  border-bottom: none;
-}
-
-.usage-block-last {
+/* ===== 数据使用情况：统一分区卡片（冷蓝玻璃 + 四角 L 形角标） ===== */
+.usage-section {
+  position: relative;
   flex: 0 0 auto;
-  display: flex;
-  flex-direction: column;
-  justify-content: flex-start;
   min-height: 0;
+  padding: 8px 10px 10px;
+  border: 1px solid rgba(73, 166, 255, 0.16);
+  border-radius: 3px;
+  background: linear-gradient(180deg, rgba(24, 42, 74, 0.36) 0%, rgba(9, 17, 32, 0.16) 100%);
+  box-shadow: inset 0 1px 0 rgba(189, 212, 255, 0.05);
 }
 
-.usage-header {
-  margin-bottom: 3px;
+.usage-section::before,
+.usage-section::after {
+  content: '';
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  pointer-events: none;
+}
+
+.usage-section::before {
+  left: -1px;
+  top: -1px;
+  border-left: 2px solid rgba(73, 166, 255, 0.72);
+  border-top: 2px solid rgba(73, 166, 255, 0.72);
+}
+
+.usage-section::after {
+  right: -1px;
+  bottom: -1px;
+  border-right: 2px solid rgba(73, 166, 255, 0.5);
+  border-bottom: 2px solid rgba(73, 166, 255, 0.5);
+}
+
+.usage-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+  min-height: 18px;
   flex-shrink: 0;
+}
+
+.usage-head-tag {
+  flex: 0 0 auto;
+  font-size: calc(11px * var(--font-boost-sm));
+  color: #bdd4ff;
+  letter-spacing: 1px;
+  padding: 1px 9px;
+  border: 1px solid rgba(189, 212, 255, 0.28);
+  border-radius: 9px;
+  background: rgba(73, 166, 255, 0.08);
+}
+
+/* 场景总数：深蓝色带，呼应原型横条 */
+.scene-band {
+  margin: -1px -3px 6px;
+  padding: 5px 10px;
+  border-left: 2px solid rgba(73, 166, 255, 0.7);
+  border-radius: 2px;
+  background: linear-gradient(90deg, rgba(20, 44, 96, 0.95), rgba(16, 34, 74, 0.62) 60%, rgba(16, 34, 74, 0.2));
 }
 
 .usage-label {
-  font-size: 12px;
-  color: var(--c-text-dim, #7a93c4);
+  font-size: calc(12px * var(--font-boost-sm));
+  color: #bdd4ff;
+}
+
+/* ===== 精简情况：左报表流 / 中预填率 / 右字段流 ===== */
+.simplify-grid {
+  display: grid;
+  grid-template-columns: 1fr 1.12fr 1fr;
+  gap: 10px;
+  align-items: stretch;
+}
+
+.simplify-flow {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.simplify-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 60px;
+  padding: 4px;
+  border: 1px solid rgba(73, 166, 255, 0.22);
+  border-radius: 4px;
+  background: linear-gradient(180deg, rgba(30, 54, 96, 0.42), rgba(9, 17, 32, 0.28));
+  overflow: hidden;
+}
+
+.simplify-stat.is-after {
+  border-color: rgba(26, 255, 239, 0.42);
+  background: linear-gradient(180deg, rgba(26, 255, 239, 0.14), rgba(9, 17, 32, 0.3));
+  box-shadow: inset 0 0 16px rgba(26, 255, 239, 0.08);
+}
+
+.ss-stage {
+  font-size: calc(11px * var(--font-boost-sm));
+  letter-spacing: 1px;
+  color: var(--c-text-dim, #8fa6c8);
+}
+
+.ss-value {
+  font-family: var(--font-num, 'DIN', monospace);
+  font-size: calc(21px * var(--font-boost-lg));
+  font-weight: 700;
+  line-height: 1.2;
+  color: #bdd4ff;
+  white-space: nowrap;
+}
+
+.simplify-stat.is-after .ss-value {
+  color: #1affef;
+  text-shadow: 0 0 10px rgba(26, 255, 239, 0.36);
+}
+
+.ss-unit {
+  font-size: calc(11px * var(--font-boost-sm));
+  color: var(--c-text-dim, #8fa6c8);
+}
+
+.simplify-arrow {
+  position: relative;
+  flex: 0 0 28px;
+}
+
+.simplify-arrow::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 0;
+  width: 1px;
+  height: 100%;
+  background: linear-gradient(180deg, rgba(73, 166, 255, 0.12), rgba(255, 199, 90, 0.85));
+}
+
+.simplify-arrow::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: 1px;
+  width: 7px;
+  height: 7px;
+  border-right: 2px solid var(--c-gold, #ffc75a);
+  border-bottom: 2px solid var(--c-gold, #ffc75a);
+  transform: translateX(-50%) rotate(45deg);
+}
+
+.simplify-rate {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-width: 0;
+  padding: 6px 4px;
+  border: 1px solid rgba(73, 166, 255, 0.22);
+  border-radius: 4px;
+  background: radial-gradient(circle at 50% 38%, rgba(26, 255, 239, 0.1), rgba(9, 17, 32, 0.18) 72%);
+}
+
+.sr-title {
+  font-size: calc(11px * var(--font-boost-sm));
+  line-height: 1.3;
+  color: #cfe3ff;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.sr-ring {
+  width: 92px;
+  height: 92px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: conic-gradient(
+    from -90deg,
+    #1affef 0deg,
+    #49a6ff var(--rate-deg, 84deg),
+    rgba(73, 166, 255, 0.14) var(--rate-deg, 84deg),
+    rgba(73, 166, 255, 0.14) 360deg
+  );
+  box-shadow: 0 0 18px rgba(26, 255, 239, 0.16);
+}
+
+.sr-ring-inner {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  border: 1px solid rgba(73, 166, 255, 0.3);
+  background: radial-gradient(circle at 50% 32%, #16305c, #071225 78%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.sr-value {
+  font-family: var(--font-num, 'DIN', monospace);
+  font-size: calc(23px * var(--font-boost-lg));
+  font-weight: 700;
+  line-height: 1.1;
+  color: #1affef;
+  text-shadow: 0 0 12px rgba(26, 255, 239, 0.42);
+}
+
+.sr-value small {
+  font-size: calc(12px * var(--font-boost-sm));
+  margin-left: 1px;
+}
+
+.sr-caption {
+  font-size: calc(11px * var(--font-boost-sm));
+  color: var(--c-text-dim, #8fa6c8);
+}
+
+.sr-formula {
+  font-family: var(--font-num, 'DIN', monospace);
+  font-size: calc(11px * var(--font-boost-sm));
+  color: var(--c-gold-deep, #e4c09d);
+  white-space: nowrap;
 }
 
 .clickable-scene {
@@ -793,7 +1058,7 @@ onBeforeUnmount(() => {
 .scene-dialog-header {
   display: flex;
   justify-content: space-between;
-  font-size: 15px;
+  font-size: calc(15px * var(--font-boost-md));
   color: #fff;
   font-weight: bold;
   margin-bottom: 12px;
@@ -822,7 +1087,7 @@ onBeforeUnmount(() => {
   display: inline-block;
   border: 1px solid #40e0ff;
   color: #40e0ff;
-  font-size: 13px;
+  font-size: calc(13px * var(--font-boost-sm));
   font-weight: bold;
   padding: 3px 12px;
   margin-bottom: 10px;
@@ -853,27 +1118,27 @@ onBeforeUnmount(() => {
 }
 
 .sc-name {
-  font-size: 13px;
+  font-size: calc(13px * var(--font-boost-sm));
   font-weight: bold;
   margin-bottom: 4px;
 }
 
 .sc-value {
-  font-size: 12px;
+  font-size: calc(12px * var(--font-boost-sm));
   color: #fff;
 }
 
 .scene-card.other-card {
   background: linear-gradient(180deg, #17b3a6, #0d8a80);
   text-align: center;
-  font-size: 13px;
+  font-size: calc(13px * var(--font-boost-sm));
   font-weight: bold;
   padding: 10px 6px;
   line-height: 1.4;
 }
 
 .usage-num {
-  font-size: 14px;
+  font-size: calc(14px * var(--font-boost-md));
   font-weight: bold;
   color: var(--c-gold, #ffc75a);
   text-shadow: 0 0 6px rgba(255, 199, 90, 0.28);
@@ -881,7 +1146,7 @@ onBeforeUnmount(() => {
 }
 
 .usage-subtitle {
-  font-size: 13px;
+  font-size: calc(13px * var(--font-boost-sm));
   color: #fff;
   font-weight: bold;
   border-left: 3px solid var(--c-primary, #409eff);
@@ -911,7 +1176,7 @@ onBeforeUnmount(() => {
 }
 
 .db-node-value {
-  font-size: 18px;
+  font-size: calc(18px * var(--font-boost-md));
   font-weight: bold;
   font-family: 'DIN', 'Consolas', monospace;
   line-height: 1.2;
@@ -921,7 +1186,7 @@ onBeforeUnmount(() => {
 }
 
 .db-node-label {
-  font-size: 12px;
+  font-size: calc(12px * var(--font-boost-sm));
   color: var(--c-text-dim, #7a93c4);
   margin-top: 2px;
 }
@@ -944,12 +1209,12 @@ onBeforeUnmount(() => {
 }
 
 .bf-label {
-  font-size: 13px;
+  font-size: calc(13px * var(--font-boost-sm));
   color: var(--c-text-dim, #7a93c4);
 }
 
 .bf-value {
-  font-size: 15px;
+  font-size: calc(15px * var(--font-boost-md));
   font-weight: bold;
   color: var(--c-gold, #ffc75a);
   text-shadow: 0 0 6px rgba(255, 199, 90, 0.28);
@@ -985,13 +1250,13 @@ onBeforeUnmount(() => {
 }
 
 .zf-title {
-  font-size: 13px;
+  font-size: calc(13px * var(--font-boost-sm));
   color: var(--c-text-dim, #7a93c4);
   white-space: nowrap;
 }
 
 .zf-value {
-  font-size: 20px;
+  font-size: calc(20px * var(--font-boost-lg));
   font-weight: bold;
   color: #40e0ff;
   font-family: 'DIN', 'Consolas', monospace;
@@ -1040,7 +1305,7 @@ onBeforeUnmount(() => {
 }
 
 .dept-dialog-title {
-  font-size: 20px;
+  font-size: calc(20px * var(--font-boost-lg));
   font-weight: bold;
   color: #fff;
   letter-spacing: 1px;
@@ -1048,7 +1313,7 @@ onBeforeUnmount(() => {
 
 .dept-dialog-subtitle {
   margin-top: 4px;
-  font-size: 12px;
+  font-size: calc(12px * var(--font-boost-sm));
   color: #7a93c4;
 }
 
@@ -1057,7 +1322,7 @@ onBeforeUnmount(() => {
   border-radius: 999px;
   border: 1px solid rgba(64, 224, 255, 0.35);
   color: #40e0ff;
-  font-size: 12px;
+  font-size: calc(12px * var(--font-boost-sm));
   white-space: nowrap;
   background: rgba(64, 224, 255, 0.08);
 }
@@ -1078,21 +1343,21 @@ onBeforeUnmount(() => {
 }
 
 .dept-overview-label {
-  font-size: 12px;
+  font-size: calc(12px * var(--font-boost-sm));
   color: #7a93c4;
 }
 
 .dept-overview-value {
   margin-top: 6px;
   color: #40e0ff;
-  font-size: 24px;
+  font-size: calc(24px * var(--font-boost-lg));
   font-weight: bold;
   font-family: 'DIN', 'Consolas', monospace;
   line-height: 1.1;
 }
 
 .dept-overview-card-wide .dept-overview-value {
-  font-size: 16px;
+  font-size: calc(16px * var(--font-boost-md));
   line-height: 1.3;
 }
 
@@ -1105,7 +1370,7 @@ onBeforeUnmount(() => {
 .dept-overview-extra {
   margin-top: 6px;
   color: var(--c-gold, #ffc75a);
-  font-size: 12px;
+  font-size: calc(12px * var(--font-boost-sm));
 }
 
 .dept-dialog-table-wrap {
@@ -1122,7 +1387,7 @@ onBeforeUnmount(() => {
   width: 26px;
   height: 26px;
   border-radius: 50%;
-  font-size: 12px;
+  font-size: calc(12px * var(--font-boost-sm));
   font-weight: bold;
   color: #cfe3ff;
   background: rgba(64, 158, 255, 0.14);

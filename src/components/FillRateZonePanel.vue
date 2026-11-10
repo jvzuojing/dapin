@@ -209,42 +209,48 @@ const backToAll = () => {
 .rate-chips {
   flex: 0 0 auto;
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   justify-content: center;
-  gap: 10px 14px;
-  padding: 6px 0 2px;
+  gap: 8px;
+  padding: 4px 0 2px;
 }
 
 .rate-chip {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 8px 14px;
-  background: rgba(8, 24, 58, 0.55);
+  gap: 7px;
+  padding: 5px 12px;
+  background: linear-gradient(180deg, rgba(14, 34, 68, 0.62) 0%, rgba(8, 24, 58, 0.55) 100%);
   border: 1px solid rgba(64, 158, 255, 0.28);
-  border-radius: 6px;
+  border-radius: 4px;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.rate-chip:hover {
+  border-color: rgba(64, 200, 255, 0.55);
+  box-shadow: 0 0 10px rgba(64, 158, 255, 0.22);
 }
 
 .chip-badge {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 52px;
-  height: 22px;
-  padding: 0 10px;
+  min-width: 46px;
+  height: 20px;
+  padding: 0 8px;
   border-radius: 999px;
   color: #fff;
-  font-size: 12px;
+  font-size: calc(12px * var(--font-boost-sm));
   font-weight: 600;
 }
 
 .chip-name {
-  font-size: 12px;
+  font-size: calc(12px * var(--font-boost-sm));
   color: #c8d6f5;
 }
 
 .chip-value {
-  font-size: 18px;
+  font-size: calc(18px * var(--font-boost-md));
   font-weight: bold;
   font-family: 'DIN', 'Consolas', monospace;
 }
@@ -257,13 +263,26 @@ const backToAll = () => {
   margin-top: 4px;
 }
 
+/* 地图底部径向光晕：把视线锚定在画布正中的地图上 */
+.map-area::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 55%;
+  transform: translate(-50%, -50%);
+  width: 92%;
+  height: 88%;
+  background: radial-gradient(ellipse at center, rgba(64, 158, 255, 0.14) 0%, rgba(64, 158, 255, 0.05) 45%, transparent 72%);
+  pointer-events: none;
+}
+
 .map-crumb {
   position: absolute;
   top: 6px;
   left: 8px;
   z-index: 2;
   padding: 3px 9px;
-  font-size: 12px;
+  font-size: calc(12px * var(--font-boost-sm));
   color: #bfe6ff;
   background: rgba(8, 34, 66, 0.78);
   border: 1px solid rgba(64, 158, 255, 0.28);
@@ -282,7 +301,7 @@ const backToAll = () => {
 
 .back-btn {
   padding: 4px 12px;
-  font-size: 12px;
+  font-size: calc(12px * var(--font-boost-sm));
   color: #bfe6ff;
   background: rgba(8, 34, 66, 0.85);
   border: 1px solid rgba(64, 200, 255, 0.55);

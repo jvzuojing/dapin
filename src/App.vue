@@ -5,18 +5,10 @@
         <StarField />
         <!-- 顶部标题栏 -->
         <header class="header-bar">
-          <div class="header-left">
-            <el-cascader
-              ref="regionCascaderRef"
-              v-model="selectedRegion"
-              :options="cascaderOptions"
-              :props="regionProps"
-              placeholder="请选择区域"
-              size="large"
-              class="region-cascader"
-              @change="handleRegionSelect"
-            />
-          </div>
+          <!-- 按验收反馈去掉左上角全局区划选择框。
+               selectedRegion 仍保留并 provide 给子组件：地图点击下钻、面包屑、
+               动态标题、数据重载都继续由它驱动，只是不再提供下拉入口。 -->
+          <div class="header-left"></div>
           <div class="header-center">
             <h1 class="main-title">{{ pageTitle }}</h1>
             <div class="header-sub">
@@ -88,15 +80,10 @@ const useApi = apiConfig.useApi
 
 // 区域选择：v-model 值为区划代码路径
 const selectedRegion = ref<string[]>([])
-const regionCascaderRef = ref<{ togglePopperVisible?: (visible?: boolean) => void; blur?: () => void } | null>(null)
+/** 仍用于动态标题解析（按 selectedRegion 反查区划名称），下拉控件已移除 */
 const cascaderOptions = computed(() =>
   useApi ? regionCascaderOptions.value : mockRegionOptions
 )
-const regionProps = {
-  expandTrigger: 'click' as const,
-  emitPath: true,
-  checkStrictly: true
-}
 
 // provide region 给子组件
 provide('selectedRegion', selectedRegion)
@@ -134,11 +121,6 @@ const currentDate = computed(() => {
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
 })
 const currentWeekday = computed(() => weekdays[now.getDay()])
-
-const handleRegionSelect = () => {
-  regionCascaderRef.value?.togglePopperVisible?.(false)
-  regionCascaderRef.value?.blur?.()
-}
 
 // 设计画布按 6654×1152 超宽大屏出图（对应原型 14楼大屏）
 const DESIGN_WIDTH = 6654
@@ -262,6 +244,9 @@ const updateScreenScale = () => {
   const nextScale = Math.min(viewportWidth / DESIGN_WIDTH, viewportHeight / DESIGN_HEIGHT)
 
   screenScale.value = nextScale
+  // body 级浮层（下拉 / tooltip / 弹窗 / 全局消息）不参与画布缩放，
+  // 把当前缩放比例写进 CSS 变量，让 global.css 里的浮层规则按同一比例归一。
+  document.documentElement.style.setProperty('--screen-scale', String(nextScale))
   stageLeft.value = Math.max(0, (viewportWidth - DESIGN_WIDTH * nextScale) / 2)
   stageTop.value = Math.max(0, (viewportHeight - DESIGN_HEIGHT * nextScale) / 2)
   notifyResize()
@@ -316,15 +301,17 @@ onBeforeUnmount(() => {
   --dashboard-pad-y: 14px;
   --dashboard-pad-x: 24px;
   --header-height: 72px;
-  /* 8 列宽度（设计稿 6654px 基准） */
-  --w-user: 600px;
-  --w-entity: 1400px;
-  --w-report: 600px;
-  --w-fillrate: 1500px;
-  --w-auto: 480px;
-  --w-simplify: 570px;
-  --w-sys: 570px;
-  --w-data: 560px;
+  /* 8 列宽度（设计稿 6654px 基准）。
+     地图列精确居中：左 3 列 2424 + 3 间隙 54 + 地图 1650/2 + 左内边距 24 = 3327 = 画布中轴。
+     列宽合计 6480 + 7 间隙 126 = 6606 = 内容区宽，无弹性余量，地图不会被挤偏。 */
+  --w-user: 560px;
+  --w-entity: 1304px;
+  --w-report: 560px;
+  --w-fillrate: 1650px;
+  --w-auto: 560px;
+  --w-simplify: 590px;
+  --w-sys: 560px;
+  --w-data: 696px;
   position: relative;
   top: 0;
   left: 0;
@@ -349,6 +336,19 @@ onBeforeUnmount(() => {
   flex-shrink: 0;
 }
 
+/* 标题栏底边中轴高光：与居中地图呼应 */
+.header-bar::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: -1px;
+  width: 420px;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, rgba(73, 166, 255, 0.55), transparent);
+  pointer-events: none;
+}
+
 .header-center {
   flex: 1;
   text-align: center;
@@ -357,7 +357,7 @@ onBeforeUnmount(() => {
 .main-title {
   /* 规范一级标题：42px，#A4C4FF → #FFFFFF → #D6DDE7 渐变，无暖色 */
   font-family: var(--font-title);
-  font-size: 42px;
+  font-size: calc(42px * var(--font-boost-lg));
   font-weight: normal;
   letter-spacing: 5px;
   background: linear-gradient(180deg, #a4c4ff 0%, #ffffff 55%, #d6dde7 100%);
@@ -369,13 +369,31 @@ onBeforeUnmount(() => {
 }
 
 .header-sub {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   margin-top: 2px;
-  font-size: 13px;
+  font-size: calc(13px * var(--font-boost-sm));
   color: var(--c-text-dim);
 }
 
+/* 日期两侧的装饰渐变线，呼应大屏中轴 */
+.header-sub::before,
+.header-sub::after {
+  content: '';
+  display: inline-block;
+  width: 120px;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(189, 212, 255, 0.45));
+}
+
+.header-sub::after {
+  background: linear-gradient(90deg, rgba(189, 212, 255, 0.45), transparent);
+}
+
 .header-sub span {
-  margin: 0 10px;
+  margin: 0 6px;
 }
 
 .header-left {
@@ -393,7 +411,7 @@ onBeforeUnmount(() => {
 
 .refresh-btn {
   padding: 8px 20px;
-  font-size: 14px;
+  font-size: calc(14px * var(--font-boost-md));
   color: var(--c-aux-blue);
   letter-spacing: 1px;
   cursor: pointer;
@@ -426,7 +444,7 @@ onBeforeUnmount(() => {
 
 .region-cascader :deep(.el-input__inner) {
   color: #fff !important;
-  font-size: 13px !important;
+  font-size: calc(13px * var(--font-boost-sm)) !important;
 }
 
 .region-cascader :deep(.el-input__prefix-inner) {
@@ -453,9 +471,10 @@ onBeforeUnmount(() => {
 }
 
 .col-user      { flex: 0 0 var(--w-user); }
-.col-entity    { flex: 1 1 var(--w-entity); }
+.col-entity    { flex: 0 0 var(--w-entity); }
 .col-report    { flex: 0 0 var(--w-report); }
-.col-fillrate  { flex: 1 1 var(--w-fillrate); }
+/* 地图列：固定宽度确保始终位于画布正中 */
+.col-fillrate  { flex: 0 0 var(--w-fillrate); }
 .col-auto      { flex: 0 0 var(--w-auto); }
 .col-simplify  { flex: 0 0 var(--w-simplify); }
 </style>
@@ -467,13 +486,13 @@ onBeforeUnmount(() => {
 }
 
 .col-right-split .right-top {
-  flex: 0 0 570px !important;
+  flex: 0 0 var(--w-sys) !important;
   height: 100%;
   min-height: 0 !important;
 }
 
 .col-right-split .right-bottom {
-  flex: 0 0 560px !important;
+  flex: 0 0 var(--w-data) !important;
   height: 100%;
   min-height: 0 !important;
 }

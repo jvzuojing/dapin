@@ -9,6 +9,7 @@ import {
   systemUsageCity as baseSysCity,
   systemUsageDept as baseSysDept,
   rootDatabase as baseRootDb,
+  simplifyOverview as baseSimplify,
   backflowData as baseBackflow,
   politicalLegalData as basePolitical,
   reportDetailList,
@@ -557,10 +558,12 @@ export function useScaledData() {
   const userLevelData = computed(() => {
     if (useApi) {
       const situation = api.userSituation.value
-      return {
-        autonomous: situation?.autonomousRegionLevelCount ?? 0,
-        city: situation?.leagueCityLevelCount ?? 0,
-        county: situation?.bannerCountyLevelCount ?? 0
+      if (situation) {
+        return {
+          autonomous: situation.autonomousRegionLevelCount ?? 0,
+          city: situation.leagueCityLevelCount ?? 0,
+          county: situation.bannerCountyLevelCount ?? 0
+        }
       }
     }
     return {
@@ -577,13 +580,16 @@ export function useScaledData() {
 
     if (useApi) {
       const list = api.userSituation.value?.regionalBarStatsVOList ?? []
-      return {
-        regions: list.map((item) => item.regionName),
-        months: baseTrend.months,
-        userCounts: list.map((item) => item.userCount ?? 0),
-        coverageRates: list.some((item) => toRate(item.rate) !== null)
-          ? list.map((item) => toRate(item.rate) ?? 0)
-          : fitLength(mockTrend.coverageRates, list.length)
+      // 接口未就绪时回退演示趋势，避免柱图整块空白
+      if (list.length) {
+        return {
+          regions: list.map((item) => item.regionName),
+          months: baseTrend.months,
+          userCounts: list.map((item) => item.userCount ?? 0),
+          coverageRates: list.some((item) => toRate(item.rate) !== null)
+            ? list.map((item) => toRate(item.rate) ?? 0)
+            : fitLength(mockTrend.coverageRates, list.length)
+        }
       }
     }
 
@@ -610,13 +616,17 @@ export function useScaledData() {
       count: Math.max(5, Math.round(item.count * scale.value))
     }))
 
-  /** 面板内的 Top 部门列表 */
+  /** 面板内的 Top 部门列表；接口暂不可用/无权限时保留演示数据，避免大屏空白 */
   const deptTopList = computed<DeptRow[]>(() => {
-    if (useApi) return (api.deptTopPage.value?.data ?? []).map(toDeptRow)
-    return mockDeptRows().slice(0, 6)
+    if (useApi) {
+      const rows = (api.deptTopPage.value?.data ?? []).map(toDeptRow)
+      if (rows.length) return rows
+    }
+    // 列表即详情：不再只留 Top6，直接给全量部门供自动滚动
+    return mockDeptRows()
   })
 
-  /** 部门分布分页查询（弹窗用） */
+  /** 部门分布全量查询：一次取回所有部门用于列表滚动；接口无数据时回退演示数据 */
   const fetchDeptUserPage = async (
     pageNum: number,
     pageSize: number
@@ -624,7 +634,9 @@ export function useScaledData() {
     if (!useApi) return slicePage(mockDeptRows(), pageNum, pageSize)
     const result = await api.fetchDeptUserPage(pageNum, pageSize)
     // 后端 total 返回的是字符串，需转成数字，否则 el-pagination 会判定为未传值而不渲染
-    return { list: (result?.data ?? []).map(toDeptRow), total: Number(result?.total ?? 0) }
+    const rows = (result?.data ?? []).map(toDeptRow)
+    if (!rows.length) return slicePage(mockDeptRows(), pageNum, pageSize)
+    return { list: rows, total: Number(result?.total ?? rows.length) }
   }
 
   /* ---------------- 报表统计（2.3） ---------------- */
@@ -679,6 +691,8 @@ export function useScaledData() {
     if (!useApi) return mock
 
     const stats = api.reportStats.value
+    // 报表统计接口未就绪/无权限时回退演示数据，避免 KPI 与分布柱状图整块空白
+    if (!stats) return mock
     return {
       national: {
         reportTotal: num(stats?.reportTotalCount),
@@ -745,14 +759,18 @@ export function useScaledData() {
     if (type === 'report') {
       if (!useApi) return slicePage(reportDetailList as unknown[], pageNum, pageSize)
       const list = await api.fetchReportList()
+      // 接口未就绪/无权限时保留演示数据，避免明细列表空白、自动滚动无内容
+      if (!list.length) return slicePage(reportDetailList as unknown[], pageNum, pageSize)
       return slicePage(list.map((item) => toReportRow(item as unknown as Record<string, unknown>)), pageNum, pageSize)
     }
 
     if (!useApi) return slicePage(taskDetailList as unknown[], pageNum, pageSize)
     const result = await api.fetchTaskPage(pageNum, pageSize)
+    const rows = (result?.data ?? []).map((item) => toTaskRow(item as unknown as Record<string, unknown>))
+    if (!rows.length) return slicePage(taskDetailList as unknown[], pageNum, pageSize)
     return {
-      list: (result?.data ?? []).map((item) => toTaskRow(item as unknown as Record<string, unknown>)),
-      total: Number(result?.total ?? 0)
+      list: rows,
+      total: Number(result?.total ?? rows.length)
     }
   }
 
@@ -942,6 +960,13 @@ export function useScaledData() {
 
   const rootDatabase = computed(() => ({ ...baseRootDb }))
 
+  /** 精简情况：原型新增区块，暂无接口，始终本地 mock */
+  const simplifyOverview = computed(() => ({
+    report: { ...baseSimplify.report },
+    field: { ...baseSimplify.field },
+    prefill: { ...baseSimplify.prefill }
+  }))
+
   const backflowData = computed(() => baseBackflow.map((item) => ({ ...item })))
 
   const politicalLegalData = computed(() => ({ ...basePolitical }))
@@ -969,6 +994,7 @@ export function useScaledData() {
     systemUsageDept,
     // 无接口模块
     rootDatabase,
+    simplifyOverview,
     backflowData,
     politicalLegalData,
     sceneData

@@ -88,10 +88,9 @@
     >
       <div class="panel-title">
         <span class="panel-title-text">用户部门分布统计</span>
-        <button class="view-more-btn" @click="showDeptDialog = true">查看更多 >></button>
       </div>
-      <div class="dept-table-wrap">
-        <el-table :data="displayDeptList" size="small" :show-header="false" class="dept-table">
+      <div ref="tableHost" class="dept-table-wrap">
+        <el-table :data="displayDeptList" size="small" :show-header="false" class="dept-table" height="100%">
           <el-table-column type="index" width="50" />
           <el-table-column prop="name" label="部门名称" />
           <el-table-column prop="count" label="账号总数" width="80" align="center">
@@ -103,55 +102,17 @@
       </div>
     </div>
 
-    <!-- 查看更多弹窗 -->
-    <el-dialog
-      v-model="showDeptDialog"
-      title="用户部门分布统计"
-      width="760px"
-      :close-on-click-modal="false"
-      class="dark-dialog"
-    >
-      <el-table
-        v-loading="dialogLoading"
-        :data="dialogList"
-        size="small"
-        height="420"
-        class="dept-dialog-table"
-      >
-        <el-table-column label="序号" width="70" align="center">
-          <template #default="{ $index }">
-            {{ (currentPage - 1) * pageSize + $index + 1 }}
-          </template>
-        </el-table-column>
-        <el-table-column prop="name" label="部门名称" />
-        <el-table-column prop="count" label="账号总数" width="100" align="center">
-          <template #default="{ row }">
-            <span class="count-num">{{ row.count }}</span>
-          </template>
-        </el-table-column>
-      </el-table>
-      <div class="pagination-wrap">
-        <el-pagination
-          v-model:current-page="currentPage"
-          v-model:page-size="pageSize"
-          :page-sizes="[10, 20, 50]"
-          :pager-count="5"
-          :total="dialogTotal"
-          layout="total, sizes, prev, pager, next, jumper"
-          small
-          background
-          @size-change="handlePageSizeChange"
-        />
-      </div>
-    </el-dialog>
+    <!-- 按验收反馈移除「查看更多」弹窗：列表直接展示全量并自动滚动 -->
   </div>
 </template>
 
 <script setup lang="ts">
+import { chartFont } from '../config/typography'
 import { ref, onMounted, onBeforeUnmount, computed, watch, nextTick } from 'vue'
 import * as echarts from 'echarts'
 import { useScaledData, useRegionData, type DeptRow } from '../composables/useRegionData'
 import { useDashboardApi } from '../composables/useDashboardApi'
+import { useTableAutoScroll } from '../composables/useTableAutoScroll'
 
 const { userOverview, userTrendData, deptTopList, userLevelData, fetchDeptUserPage } = useScaledData()
 const { selectedRegion, scaleVersion } = useRegionData()
@@ -192,7 +153,7 @@ const formatPercentText = (value: unknown, digits = 2) => {
 }
 
 const truncateAxisLabel = (label: string, max = 5) => (
-  label.length > max ? `${label.slice(0, max)}...` : label
+  label.length > max ? `${label.slice(0, max)}…` : label
 )
 
 const coverageDetails = computed(() => {
@@ -215,47 +176,26 @@ const coverageDetails = computed(() => {
   }
 })
 
-// 弹窗（接口分页）
-const showDeptDialog = ref(false)
-const currentPage = ref(1)
-const pageSize = ref(10)
-const dialogList = ref<DeptRow[]>([])
-const dialogTotal = ref(0)
-const dialogLoading = ref(false)
+/**
+ * 验收反馈：列表即详情，不再需要点击「查看更多」弹出。
+ * 一次取回全部部门并自动滚动（原型批注：直接获取所有，然后滚动，鼠标放上去静止）。
+ */
+const allDeptList = ref<DeptRow[]>([])
+const displayDeptList = computed(() =>
+  allDeptList.value.length ? allDeptList.value : deptTopList.value
+)
 
-const displayDeptList = computed(() => deptTopList.value.slice(0, 10))
-
-const loadDeptPage = async () => {
-  dialogLoading.value = true
-  try {
-    const res = await fetchDeptUserPage(currentPage.value, pageSize.value)
-    dialogList.value = res.list
-    dialogTotal.value = res.total
-  } finally {
-    dialogLoading.value = false
-  }
+const loadAllDept = async () => {
+  const res = await fetchDeptUserPage(1, 500)
+  allDeptList.value = res?.list ?? []
 }
 
-const handlePageSizeChange = () => {
-  currentPage.value = 1
-  if (showDeptDialog.value) loadDeptPage()
-}
-
-watch(showDeptDialog, (v) => {
-  if (v) {
-    currentPage.value = 1
-    loadDeptPage()
-    nextTick(() => {
-      resizeAll()
-    })
-  }
-})
-
-watch(currentPage, () => {
-  if (showDeptDialog.value) loadDeptPage()
-})
+/** 列表自动滚动：鼠标移入暂停、移出继续 */
+const tableHost = ref<HTMLElement | null>(null)
+useTableAutoScroll(tableHost, () => displayDeptList.value.length)
 
 watch(selectedRegion, () => {
+  void loadAllDept()
   nextTick(() => {
     updateAllCharts()
   })
@@ -308,7 +248,7 @@ const updateCountyRing = () => {
         label: { show: false },
         labelLine: { show: false },
         emphasis: {
-          label: { show: true, fontSize: 11, fontWeight: 'bold', color: '#fff', formatter: '{b}\n{c}' }
+          label: { show: true, fontSize: chartFont(11), fontWeight: 'bold', color: '#fff', formatter: '{b}\n{c}' }
         },
         data
       },
@@ -323,8 +263,8 @@ const updateCountyRing = () => {
           position: 'center',
           formatter: `{total|${total.toLocaleString()}}\n{label|总数}`,
           rich: {
-            total: { fontSize: 15, fontWeight: 'bold', color: '#40e0ff', align: 'center' },
-            label: { fontSize: 11, color: '#7a93c4', align: 'center', padding: [1, 0, 0, 0] }
+            total: { fontSize: chartFont(15), fontWeight: 'bold', color: '#40e0ff', align: 'center' },
+            label: { fontSize: chartFont(11), color: '#7a93c4', align: 'center', padding: [1, 0, 0, 0] }
           }
         },
         labelLine: { show: false },
@@ -424,25 +364,25 @@ const updateTrendChart = () => {
     },
     legend: {
       data: ['用户数', '村社覆盖率'],
-      textStyle: { color: '#7a93c4', fontSize: 15 },
+      textStyle: { color: '#7a93c4', fontSize: chartFont(15) },
       top: 0,
       left: 'center',
       itemGap: 22,
       itemWidth: 14,
       itemHeight: 10
     },
-    grid: { top: 26, right: 6, bottom: 2, left: 6, containLabel: true },
+    grid: { top: 26, right: 6, bottom: 12, left: 6, containLabel: true },
     xAxis: {
       type: 'category',
       data: userTrendData.value.regions,
       axisLine: { lineStyle: { color: 'rgba(64,158,255,0.3)' } },
       axisLabel: {
-        color: '#7a93c4',
-        fontSize: 11,
+        color: '#a9c8f5',
+        fontSize: chartFont(11, true),
         interval: 0,
-        rotate: 32,
+        rotate: 52,
         margin: 4,
-        formatter: (value: string) => truncateAxisLabel(value, 4)
+        formatter: (value: string) => truncateAxisLabel(value, 3)
       }
     },
     yAxis: [
@@ -450,7 +390,7 @@ const updateTrendChart = () => {
         type: 'value',
         splitNumber: 5,
         axisLine: { show: false },
-        axisLabel: { color: '#7a93c4', fontSize: 14, formatter: (value: number) => formatAxisCount(value) },
+        axisLabel: { color: '#7a93c4', fontSize: chartFont(14), formatter: (value: number) => formatAxisCount(value) },
         splitLine: { lineStyle: { color: 'rgba(64,158,255,0.1)' } }
       },
       {
@@ -459,7 +399,7 @@ const updateTrendChart = () => {
         max: 100,
         interval: 20,
         axisLine: { show: false },
-        axisLabel: { color: '#7a93c4', fontSize: 14, formatter: '{value}%' },
+        axisLabel: { color: '#7a93c4', fontSize: chartFont(14), formatter: '{value}%' },
         splitLine: { show: false }
       }
     ],
@@ -521,6 +461,7 @@ let resizeHandler: (() => void) | null = null
 let ro: ResizeObserver | null = null
 
 onMounted(() => {
+  void loadAllDept()
   nextTick(() => {
     initCountyRing()
     initCoverageRings()
@@ -546,22 +487,25 @@ onBeforeUnmount(() => {
 .user-panel-root {
   display: flex;
   flex-direction: column;
-  gap: var(--dashboard-gap, 10px);
+  /* 验收反馈：整体布局紧凑一点 */
+  gap: 6px;
   flex: 1 1 auto;
   height: 100%;
   min-height: 0;
 }
 
+/* 「用户情况」内容最高（卡片+双环），分到最多；趋势图保住底线；
+   部门列表本身自动滚动，让出少量高度不影响使用 */
 .left-top {
-  flex: 0.56 1 auto;
-  min-height: var(--left-top-min-height, 258px);
+  flex: 0.56 1 0;
+  min-height: 0;
   display: flex;
   flex-direction: column;
 }
 
 .left-bottom {
-  flex: 1.1 1 auto;
-  min-height: var(--left-bottom-min-height, 252px);
+  flex: 0.47 1 0;
+  min-height: 0;
   display: flex;
   flex-direction: column;
 }
@@ -572,10 +516,18 @@ onBeforeUnmount(() => {
 }
 
 .left-dept {
-  flex: 0 0 var(--left-dept-height, 150px);
+  flex: 0.97 1 0;
   min-height: 0;
   display: flex;
   flex-direction: column;
+}
+
+/* 紧凑标题：左侧三块面板共用，每块省 4px 给图表内容 */
+.left-top .panel-title,
+.left-bottom .panel-title,
+.left-dept .panel-title {
+  padding-bottom: 6px;
+  margin-bottom: 8px;
 }
 
 .left-dept .dept-table-wrap {
@@ -584,21 +536,23 @@ onBeforeUnmount(() => {
   overflow: hidden;
 }
 
+.dept-table { height: 100%; }
+
 /* 数据卡片 */
 .stat-cards {
   display: flex;
-  gap: 6px;
-  margin-bottom: 3px;
+  gap: 4px;
+  margin-bottom: 2px;
   flex-shrink: 0;
 }
 
 .stat-cards .stat-card {
   flex: 1;
-  padding: 3px 6px;
+  padding: 2px 5px;
 }
 
 .stat-cards .stat-card .value {
-  font-size: 16px;
+  font-size: calc(16px * var(--font-boost-md));
 }
 
 /* 圆环图 */
@@ -613,7 +567,7 @@ onBeforeUnmount(() => {
 .ring-main-row {
   display: flex;
   align-items: stretch;
-  gap: 8px;
+  gap: 5px;
   flex: 1;
   min-height: 0;
 }
@@ -638,7 +592,7 @@ onBeforeUnmount(() => {
 
 .ring-item.level-item {
   flex: 0 0 auto;
-  min-height: var(--left-level-ring-min-height, 118px);
+  min-height: var(--left-level-ring-min-height, 108px);
 }
 
 .chart-ring {
@@ -671,7 +625,7 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: center;
   gap: 5px;
-  font-size: 13px;
+  font-size: calc(13px * var(--font-boost-sm));
   color: var(--c-text, #c8d6f5);
   white-space: nowrap;
 }
@@ -691,7 +645,7 @@ onBeforeUnmount(() => {
 }
 
 .ring-label {
-  font-size: 12px;
+  font-size: calc(12px * var(--font-boost-sm));
   color: var(--c-cyan, #40e0ff);
   text-align: center;
   flex-shrink: 0;
@@ -709,7 +663,7 @@ onBeforeUnmount(() => {
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  gap: 4px;
+  gap: 2px;
   min-width: 0;
   margin-left: -4px;
 }
@@ -722,7 +676,7 @@ onBeforeUnmount(() => {
   justify-content: flex-start;
   gap: 4px;
   min-width: 0;
-  min-height: var(--left-coverage-col-min-height, 96px);
+  min-height: var(--left-coverage-col-min-height, 84px);
 }
 
 .coverage-ring-sm {
@@ -738,7 +692,7 @@ onBeforeUnmount(() => {
 }
 
 .coverage-col .ring-label {
-  font-size: 11px;
+  font-size: calc(11px * var(--font-boost-sm));
 }
 
 .coverage-info {
@@ -750,10 +704,11 @@ onBeforeUnmount(() => {
 
 .coverage-detail {
   margin-top: 1px;
-  font-size: 11px;
+  font-size: calc(11px * var(--font-boost-sm));
   line-height: 1.15;
   color: var(--c-text-dim, #7a93c4);
   text-align: left;
+  white-space: nowrap;
 }
 
 /* 环 + 环外覆盖率数字（竖排居中） */
@@ -766,7 +721,7 @@ onBeforeUnmount(() => {
 }
 
 .coverage-rate-text {
-  font-size: 12px;
+  font-size: calc(12px * var(--font-boost-sm));
   line-height: 1.1;
   font-weight: bold;
   font-family: 'DIN', 'Consolas', monospace;
@@ -793,7 +748,7 @@ onBeforeUnmount(() => {
 
 .dept-table :deep(td) {
   color: var(--c-text, #c8d6f5) !important;
-  font-size: 13px !important;
+  font-size: calc(13px * var(--font-boost-sm)) !important;
   padding: 2px 0 !important;
 }
 
@@ -805,7 +760,7 @@ onBeforeUnmount(() => {
   color: var(--c-cyan, #40e0ff);
   font-weight: bold;
   font-family: 'DIN', 'Consolas', monospace;
-  font-size: 15px;
+  font-size: calc(15px * var(--font-boost-md));
 }
 
 /* 弹窗 */

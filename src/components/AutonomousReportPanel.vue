@@ -39,6 +39,7 @@
 </template>
 
 <script setup lang="ts">
+import { chartFont } from '../config/typography'
 import { computed, onMounted, onBeforeUnmount, ref, watch } from 'vue'
 import * as echarts from 'echarts'
 import { useDashboardApi } from '../composables/useDashboardApi'
@@ -134,7 +135,7 @@ const renderBar = () => {
       ],
       xAxis: {
         type: 'value',
-        axisLabel: { color: '#7a93c4', fontSize: 10, formatter: '{value}张' },
+        axisLabel: { color: '#7a93c4', fontSize: chartFont(10), formatter: '{value}张' },
         splitLine: { lineStyle: { color: 'rgba(64,158,255,0.08)' } }
       },
       yAxis: {
@@ -144,7 +145,7 @@ const renderBar = () => {
         axisLine: { lineStyle: { color: 'rgba(64,158,255,0.2)' } },
         axisTick: { show: false },
         axisLabel: {
-          color: '#a9c8f5', fontSize: 11, width: 108, margin: 10,
+          color: '#a9c8f5', fontSize: chartFont(11, true), width: 108, margin: 10,
           overflow: 'truncate', rotate: 20,
           formatter: (v: string) => clipLabel(v)
         }
@@ -161,7 +162,7 @@ const renderBar = () => {
             borderRadius: [0, 3, 3, 0]
           },
           barMaxWidth: 10,
-          label: { show: true, position: 'right', color: '#40e0ff', fontSize: 10, formatter: '{c}' }
+          label: { show: true, position: 'right', color: '#40e0ff', fontSize: chartFont(10), formatter: '{c}' }
         }
       ]
     },
@@ -211,20 +212,20 @@ onBeforeUnmount(() => {
 }
 
 .kpi-value {
-  font-size: 20px;
+  font-size: calc(20px * var(--font-boost-lg));
   font-weight: bold;
   color: #40e0ff;
   font-family: 'DIN', 'Consolas', monospace;
 }
 
-.kpi-value small { font-size: 12px; margin-left: 2px; }
+.kpi-value small { font-size: calc(12px * var(--font-boost-sm)); margin-left: 2px; }
 
-.kpi-label { margin-top: 2px; font-size: 12px; color: #c8d6f5; }
+.kpi-label { margin-top: 2px; font-size: calc(12px * var(--font-boost-sm)); color: #c8d6f5; }
 
 .sec-title {
   flex: 0 0 auto;
   text-align: center;
-  font-size: 13px;
+  font-size: calc(13px * var(--font-boost-sm));
   color: #40e0ff;
   letter-spacing: 2px;
   margin: 2px 0;

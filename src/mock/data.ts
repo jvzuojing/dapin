@@ -366,6 +366,29 @@ export const systemUsageDept = {
   visits: [260, 230, 200, 190, 175, 165, 160, 155, 145, 130]
 }
 
+// 数据使用情况 - 精简情况（原型新增区块，暂无接口，保留本地 mock）
+// 语义：精简前/精简后的报表与字段数量，以及基层填报数据预填率
+export const simplifyOverview = {
+  report: {
+    title: '报表精简',
+    before: '19708张',
+    after: '94张',
+    unit: '报表'
+  },
+  field: {
+    title: '字段精简',
+    before: '282050项',
+    after: '2550项',
+    unit: '字段'
+  },
+  prefill: {
+    title: '基层填报数据预填率',
+    numerator: '651',
+    denominator: '2550',
+    rate: 25.53
+  }
+}
+
 // 数据使用情况 - 一表通根数据库
 export const rootDatabase = {
   departments: 16,

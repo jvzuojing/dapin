@@ -56,13 +56,37 @@ const defs: Array<{ key: string; title: string }> = [
   { key: 'changsuo', title: '场所治理情况' }
 ]
 
-/** 房屋块的「居住状态分布」接口暂无数据，先用演示值 */
-const DEMO_DONUT_DATA: Record<string, Array<{ title: string; data: Array<{ name: string; value: number }> }>> = {
+/**
+ * 环图逻辑与 pc 项目 CenterPanel.entityPieConfig 对齐（接口字段一致）：
+ * 1) 优先用适配层 pieGroups（接口 2.11 dataTypeCount：房屋=fwjzqkData 居住状态 + fwjzlxData 房屋类型，企业/场所=主分类）
+ * 2) 接口未提供时，房屋/场所回退原型演示值
+ * 3) 企业类型分布接口暂未提供（pc 同款过滤），企业块不显示环图、柱图横向占满
+ */
+const DEMO_PIE_GROUPS: Record<string, Array<{ title: string; data: Array<{ name: string; value: number }> }>> = {
   fang: [
     { title: '居住状态分布', data: [
       { name: '自住房', value: 38 },
       { name: '出租房', value: 26 },
       { name: '空置房', value: 14 },
+      { name: '其他', value: 8 }
+    ] },
+    { title: '房屋类型分布', data: [
+      { name: '楼房', value: 48 },
+      { name: '平房', value: 22 },
+      { name: '其他', value: 9 }
+    ] }
+  ],
+  changsuo: [
+    { title: '场所类型分布情况', data: [
+      { name: '小商店', value: 66 },
+      { name: '小医院', value: 18 },
+      { name: '小旅馆', value: 20 },
+      { name: '小餐饮场所', value: 54 },
+      { name: '小歌舞厅娱乐场所', value: 12 },
+      { name: '小网吧', value: 9 },
+      { name: '小美容洗浴场所', value: 14 },
+      { name: '小生产加工企业', value: 11 },
+      { name: '小学校或幼儿园', value: 24 },
       { name: '其他', value: 8 }
     ] }
   ]
@@ -80,18 +104,15 @@ const blocks = computed<BlockDef[]>((): BlockDef[] => defs.map((def): BlockDef =
       empty: true
     }
   }
-  const typeStats = Array.isArray(entity.typeStats) ? entity.typeStats : []
-  const donutDefs: Array<{ title: string; data: Array<{ name: string; value: number }> }> = []
-  // 房屋：居住状态（演示）+ 房屋类型（typeStats）
-  if (def.key === 'fang') {
-    donutDefs.push(...(DEMO_DONUT_DATA.fang ?? []))
-    if (typeStats.length) donutDefs.push({ title: '房屋类型分布', data: typeStats })
-  } else if (def.key === 'changsuo' && typeStats.length) {
-    donutDefs.push({ title: '场所类型分布情况', data: typeStats })
-  } else if (def.key === 'qi' && typeStats.length) {
-    donutDefs.push({ title: '企业类型分布情况', data: typeStats })
-  }
-    return {
+  // 环图取数与 pc 一致：pieGroups 优先；企业环被 pc 逻辑过滤掉
+  const pieGroups = Array.isArray(entity.pieGroups)
+    ? (entity.pieGroups as Array<{ title: string; data: Array<{ name: string; value: number }> }>)
+        .filter(g => !g.title.includes('企业'))
+    : []
+  const donuts = def.key === 'ren'
+    ? undefined
+    : (pieGroups.length ? pieGroups : (DEMO_PIE_GROUPS[def.key] ?? []))
+  return {
       title: def.title,
       total: entity.total ?? '--',
       tagTotal: def.key === 'ren' ? (entity.tagTotal ?? '') : '',
@@ -102,7 +123,7 @@ const blocks = computed<BlockDef[]>((): BlockDef[] => defs.map((def): BlockDef =
     cloudWords: def.key === 'ren' && Array.isArray(entity.cloudWords)
       ? entity.cloudWords.slice(0, 20).map((w: any) => ({ ...w, name: lastTagSegment(w.name) }))
       : undefined,
-    donuts: donutDefs
+    donuts
   }
 }))
 </script>

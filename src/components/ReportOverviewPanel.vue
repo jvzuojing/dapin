@@ -2,11 +2,10 @@
   <div class="report-panel panel">
     <div class="panel-title">
       <span class="panel-title-text">国家报表</span>
-      <div class="dashboard-tabs">
-        <span class="dashboard-tab active">国家报表</span>
-      </div>
     </div>
 
+    <!-- 验收反馈：统计卡 + 柱状图共占 50%，下面明细列表占 50% -->
+    <div class="report-top">
     <div class="kpi-grid">
       <div class="kpi-card">
         <div class="kpi-label">报表总数</div>
@@ -32,7 +31,9 @@
 
     <div class="dist-title">分布情况</div>
     <div ref="distributionRef" class="chart-dist"></div>
+    </div>
 
+    <div class="report-bottom">
     <div class="dashboard-tabs detail-tabs">
       <span
         v-for="tab in detailTabs"
@@ -43,43 +44,37 @@
       >{{ tab.label }}</span>
     </div>
 
+    <div ref="tableHost" class="detail-table-wrap">
+    <!-- 不加 loading 遮罩：接口排队/失败时列表仍展示演示数据并持续自动滚动 -->
     <el-table
-      v-loading="loading"
       :data="list"
       size="small"
       class="detail-table"
-      height="240"
+      height="100%"
     >
       <el-table-column prop="name" label="报表名称" min-width="150" show-overflow-tooltip />
       <el-table-column prop="dept" label="派发部委" width="110" show-overflow-tooltip />
       <el-table-column prop="freq" label="频次" width="60" align="center" />
-      <el-table-column prop="time" label="下发时间" width="90" align="center" />
+      <el-table-column prop="time" label="下发时间" width="116" align="center" />
       <el-table-column prop="status" label="状态" width="74" align="center">
         <template #default="{ row }">
           <span class="status-tag" :class="statusClass(row.status)">{{ row.status }}</span>
         </template>
       </el-table-column>
     </el-table>
-    <div class="table-foot">
-      <span class="page-total">共 {{ pageTotal }} 条</span>
-      <el-pagination
-        v-model:current-page="currentPage"
-        v-model:page-size="pageSize"
-        :page-sizes="[10, 20, 50]"
-        :total="pageTotal"
-        layout="prev, pager, next"
-        small
-        background
-      />
+    </div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
+import { chartFont } from '../config/typography'
 import { ref, computed, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
 import * as echarts from 'echarts'
 import { useScaledData } from '../composables/useRegionData'
 import { useRegionData } from '../composables/useRegionData'
+import { useTableAutoScroll } from '../composables/useTableAutoScroll'
+import { reportDetailList } from '../mock/data'
 
 const { reportData, fetchDetailList } = useScaledData()
 const { scaleVersion } = useRegionData()
@@ -99,9 +94,11 @@ const detailTabs = [
 const detailTab = ref<'report' | 'task'>('report')
 
 const currentPage = ref(1)
-const pageSize = ref(10)
-const list = ref<any[]>([])
-const pageTotal = ref(0)
+/** 明细列表一次取全量并自动滚动，不再分页（原型批注：直接获取所有，然后滚动） */
+const pageSize = ref(500)
+/** 首屏先用演示数据填充，接口就绪后由 loadDetail 覆盖，避免列表空白 */
+const list = ref<any[]>([...reportDetailList] as any[])
+const pageTotal = ref(reportDetailList.length)
 const loading = ref(false)
 
 const loadDetail = async () => {
@@ -166,7 +163,7 @@ const updateChart = () => {
     legend: {
       show: multiSeries,
       data: distribution.series.map((item) => item.name),
-      textStyle: { color: '#7a93c4', fontSize: 12 },
+      textStyle: { color: '#7a93c4', fontSize: chartFont(12) },
       top: 0,
       right: 0,
       itemWidth: 12,
@@ -176,17 +173,17 @@ const updateChart = () => {
       type: 'inside',
       yAxisIndex: 0,
       startValue: 0,
-      endValue: 5,
+      endValue: 7,
       zoomOnMouseWheel: false,
       moveOnMouseWheel: true,
       moveOnMouseMove: true,
       filterMode: 'filter'
     }],
-    grid: { top: multiSeries ? 22 : 8, right: 24, bottom: 12, left: 8, containLabel: true },
+    grid: { top: multiSeries ? 18 : 4, right: 20, bottom: 6, left: 6, containLabel: true },
     xAxis: {
       type: 'value',
       axisLine: { lineStyle: { color: 'rgba(64,158,255,0.2)' } },
-      axisLabel: { color: '#7a93c4', fontSize: 11, formatter: (v: number) => formatAxisCount(v) },
+      axisLabel: { color: '#7a93c4', fontSize: chartFont(11), formatter: (v: number) => formatAxisCount(v) },
       minInterval: 1,
       splitLine: { lineStyle: { color: 'rgba(64,158,255,0.08)' } }
     },
@@ -198,7 +195,7 @@ const updateChart = () => {
       axisTick: { show: false },
       axisLabel: {
         color: '#7a93c4',
-        fontSize: 11,
+        fontSize: chartFont(11),
         width: 76,
         overflow: 'truncate'
       },
@@ -215,9 +212,10 @@ const updateChart = () => {
         ]),
         borderRadius: [0, 4, 4, 0]
       },
-      barMaxWidth: multiSeries ? 10 : 14,
-      barGap: '40%',
-      label: { show: !multiSeries, position: 'right', color: series.color[1], fontSize: 11, distance: 4 }
+      barMaxWidth: multiSeries ? 9 : 12,
+      barCategoryGap: '14%',
+      barGap: '20%',
+      label: { show: !multiSeries, position: 'right', color: series.color[1], fontSize: chartFont(11), distance: 4 }
     }))
   }, true)
 }
@@ -242,6 +240,10 @@ onBeforeUnmount(() => {
 
 watch(reportData, () => updateChart(), { deep: true })
 watch(scaleVersion, () => chart?.resize())
+
+/** 列表自动滚动：鼠标移入暂停、移出继续 */
+const tableHost = ref<HTMLElement | null>(null)
+useTableAutoScroll(tableHost, () => list.value.length)
 </script>
 
 <style scoped>
@@ -252,30 +254,51 @@ watch(scaleVersion, () => chart?.resize())
   min-height: 0;
 }
 
+/* 验收反馈：统计卡 + 柱状图共 50%，明细列表 50% */
+.report-top {
+  flex: 0 0 50%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.report-bottom {
+  flex: 1 1 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.detail-table-wrap {
+  flex: 1 1 0;
+  min-height: 0;
+}
+
+/* 数量统计紧凑，一行 3 个 */
 .kpi-grid {
   flex: 0 0 auto;
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 8px;
-  margin: 8px 0;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+  margin: 6px 0;
 }
 
 .kpi-card {
   background: var(--c-card-bg, rgba(30, 50, 100, 0.35));
   border: 1px solid var(--c-border, rgba(64, 158, 255, 0.25));
   border-radius: 4px;
-  padding: 8px 6px;
+  padding: 5px 4px;
   text-align: center;
 }
 
 .kpi-label {
-  font-size: 12px;
+  font-size: calc(11px * var(--font-boost-sm));
   color: var(--c-text, #c8d6f5);
 }
 
 .kpi-value {
   margin-top: 2px;
-  font-size: 18px;
+  font-size: calc(16px * var(--font-boost-md));
   font-weight: bold;
   color: var(--c-cyan, #40e0ff);
   font-family: 'DIN', 'Consolas', monospace;
@@ -287,7 +310,7 @@ watch(scaleVersion, () => chart?.resize())
 .dist-title {
   flex: 0 0 auto;
   text-align: center;
-  font-size: 13px;
+  font-size: calc(13px * var(--font-boost-sm));
   color: #40e0ff;
   letter-spacing: 2px;
   margin-bottom: 2px;
@@ -305,7 +328,7 @@ watch(scaleVersion, () => chart?.resize())
 }
 
 .detail-table {
-  flex: 0 0 auto;
+  height: 100%;
 }
 
 .table-foot {
@@ -317,7 +340,7 @@ watch(scaleVersion, () => chart?.resize())
 }
 
 .page-total {
-  font-size: 12px;
+  font-size: calc(12px * var(--font-boost-sm));
   color: #7a93c4;
 }
 </style>
