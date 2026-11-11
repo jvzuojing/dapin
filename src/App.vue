@@ -117,7 +117,7 @@ const pageTitle = computed(() => {
   const visibleLabels = labels.length > 1 ? labels.slice(1) : labels
   const lastTwo = visibleLabels.slice(-2)
   const regionTitle = lastTwo.join(' ')
-  return regionTitle ? `${regionTitle}基层"一表通"数据驾驶舱` : '内蒙古自治区基层"一表通"数据驾驶舱'
+  return regionTitle ? `${regionTitle}"一表通"数据驾驶舱` : '内蒙古自治区"一表通"数据驾驶舱'
 })
 
 // 日期
