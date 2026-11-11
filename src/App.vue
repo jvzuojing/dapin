@@ -26,15 +26,18 @@
           </div>
         </header>
 
-        <!-- 超宽 8 列布局（对应原型 14楼大屏）：
-             用户情况 | 基层治理 | 国家报表 | 数据填报率(地图) | 自治区报表 | 基层精简保留清单 | 系统使用 | 数据使用 -->
+        <!-- 超宽 8 列布局，列顺序（从左到右）：
+             用户情况 | 系统使用情况 | 基层精简保留清单 | 国家报表 |
+             各盟市嘎查村覆盖率(地图) | 数据表情况 | 基层治理情况 | 数据使用情况
+             注：系统使用/数据使用由 RightPanel 以 display:contents 摊开，
+                 它们在第 2 / 第 8 位，靠下方 style 里的 order 定位。 -->
         <main class="main-content">
           <div class="col col-user">
             <UserPanel />
           </div>
 
-          <div class="col col-entity">
-            <EntityZonePanel />
+          <div class="col col-simplify">
+            <SimplifyListPanel />
           </div>
 
           <div class="col col-report">
@@ -49,8 +52,8 @@
             <AutonomousReportPanel />
           </div>
 
-          <div class="col col-simplify">
-            <SimplifyListPanel />
+          <div class="col col-entity">
+            <EntityZonePanel />
           </div>
 
           <!-- RightPanel 内部两块以 display:contents 摊开成两列 -->
@@ -511,13 +514,14 @@ onBeforeUnmount(() => {
   height: 100%;
 }
 
-.col-user      { flex: 0 0 var(--w-user); }
-.col-entity    { flex: 0 0 var(--w-entity); }
-.col-report    { flex: 0 0 var(--w-report); }
-/* 地图列：固定宽度确保始终位于画布正中 */
-.col-fillrate  { flex: 0 0 var(--w-fillrate); }
-.col-auto      { flex: 0 0 var(--w-auto); }
-.col-simplify  { flex: 0 0 var(--w-simplify); }
+/* 列顺序（order）与宽度分开控制：宽度跟着面板走，顺序按业务给定的 8 列排 */
+.col-user      { flex: 0 0 var(--w-user);     order: 1; }
+.col-entity    { flex: 0 0 var(--w-entity);   order: 7; }
+.col-report    { flex: 0 0 var(--w-report);   order: 4; }
+/* 地图列：固定宽度，保证地图比例稳定 */
+.col-fillrate  { flex: 0 0 var(--w-fillrate); order: 5; }
+.col-auto      { flex: 0 0 var(--w-auto);     order: 6; }
+.col-simplify  { flex: 0 0 var(--w-simplify); order: 3; }
 </style>
 
 <style>
@@ -528,12 +532,14 @@ onBeforeUnmount(() => {
 
 .col-right-split .right-top {
   flex: 0 0 var(--w-sys) !important;
+  order: 2;
   height: 100%;
   min-height: 0 !important;
 }
 
 .col-right-split .right-bottom {
   flex: 0 0 var(--w-data) !important;
+  order: 8;
   height: 100%;
   min-height: 0 !important;
 }

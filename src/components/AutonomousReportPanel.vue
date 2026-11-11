@@ -1,7 +1,7 @@
 <template>
   <div class="auto-report panel">
     <div class="panel-title">
-      <span class="panel-title-text">自治区报表</span>
+      <span class="panel-title-text">数据表情况</span>
     </div>
 
     <div class="kpi-row">
