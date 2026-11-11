@@ -49,7 +49,7 @@
                 <div class="coverage-rate-text township">{{ coverageDetails.township.rateText }}</div>
               </div>
               <div class="coverage-info">
-                <div class="ring-label">乡镇街道（苏木）覆盖率</div>
+                <div class="ring-label">乡镇街道（苏木）<br />覆盖率</div>
                 <div class="coverage-detail">{{ coverageDetails.township.summary }}</div>
               </div>
             </div>
@@ -59,7 +59,7 @@
                 <div class="coverage-rate-text village">{{ coverageDetails.village.rateText }}</div>
               </div>
               <div class="coverage-info">
-                <div class="ring-label">村社区（嘎查）覆盖率</div>
+                <div class="ring-label">村社区（嘎查）<br />覆盖率</div>
                 <div class="coverage-detail">{{ coverageDetails.village.summary }}</div>
               </div>
             </div>
@@ -659,7 +659,7 @@ onBeforeUnmount(() => {
   margin-top: 2px;
 }
 
-/* 覆盖率双环并排 */
+/* 覆盖率双环并排：整体左移 + 环缩小，给右侧「已覆盖 x/x」文字让出宽度 */
 .coverage-stack {
   flex: 0 0 170px;
   display: flex;
@@ -667,7 +667,8 @@ onBeforeUnmount(() => {
   justify-content: space-between;
   gap: 2px;
   min-width: 0;
-  margin-left: -4px;
+  margin-left: -20px;
+  margin-right: 16px;
 }
 
 .coverage-col {
@@ -676,15 +677,15 @@ onBeforeUnmount(() => {
   flex-direction: row;
   align-items: center;
   justify-content: flex-start;
-  gap: 4px;
+  gap: 3px;
   min-width: 0;
   min-height: var(--left-coverage-col-min-height, 84px);
 }
 
 .coverage-ring-sm {
-  width: 70px;
-  height: 70px;
-  flex: 0 0 70px;
+  width: 64px;
+  height: 64px;
+  flex: 0 0 64px;
   min-height: 0;
 }
 
@@ -715,7 +716,7 @@ onBeforeUnmount(() => {
 
 /* 环 + 环外覆盖率数字（竖排居中） */
 .coverage-ring-wrap {
-  flex: 0 0 70px;
+  flex: 0 0 64px;
   display: flex;
   flex-direction: column;
   align-items: center;

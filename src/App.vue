@@ -1,5 +1,8 @@
 <template>
-  <div class="screen-shell">
+  <div
+    class="screen-shell"
+    :class="{ 'is-unscaled': !scaleEnabled && stretchToViewport }"
+  >
     <div class="screen-stage" :style="stageStyle">
       <div class="screen-wrapper" :style="wrapperStyle">
         <StarField />
@@ -129,16 +132,36 @@ const screenScale = ref(1)
 const stageLeft = ref(0)
 const stageTop = ref(0)
 
+/** 画面等比缩放开关。false = 按设计稿 6654×1152 原尺寸 1:1 渲染（验收排查样式用）；
+ *  临时关闭，需要恢复时把常量改回 true，或在地址后加 ?scale=1 / ?scale=0 运行时切换 */
+const ENABLE_SCREEN_SCALE = false
+
+const isScreenScaleEnabled = () => {
+  const q = new URLSearchParams(window.location.search).get('scale')
+  if (q === '1') return true
+  if (q === '0') return false
+  return ENABLE_SCREEN_SCALE
+}
+
+const scaleEnabled = ref(ENABLE_SCREEN_SCALE)
+/** 画布是否按可视区高度拉伸：只有视口两个方向都不小于设计稿时才拉伸，
+ *  否则按比例缩小后高度由 design * scale 决定 */
+const stretchToViewport = ref(true)
+
 const stageStyle = computed(() => ({
   width: `${DESIGN_WIDTH * screenScale.value}px`,
-  height: `${DESIGN_HEIGHT * screenScale.value}px`,
+  // 拉伸态用百分比高度跟随可视区（不会因滚动条占位溢出）；
+  // 缩小态高度即渲染后的设计稿高度，垂直方向居中留白
+  height: stretchToViewport.value
+    ? '100%'
+    : `${DESIGN_HEIGHT * screenScale.value}px`,
   left: `${stageLeft.value}px`,
   top: `${stageTop.value}px`
 }))
 
 const wrapperStyle = computed(() => ({
   width: `${DESIGN_WIDTH}px`,
-  height: `${DESIGN_HEIGHT}px`,
+  height: stretchToViewport.value ? '100%' : `${DESIGN_HEIGHT}px`,
   transform: `scale(${screenScale.value})`,
   transformOrigin: 'top left'
 }))
@@ -239,16 +262,29 @@ const notifyResize = () => {
 }
 
 const updateScreenScale = () => {
-  const viewportWidth = window.innerWidth
-  const viewportHeight = window.innerHeight
-  const nextScale = Math.min(viewportWidth / DESIGN_WIDTH, viewportHeight / DESIGN_HEIGHT)
+  const viewportWidth = document.documentElement.clientWidth || window.innerWidth
+  const viewportHeight = document.documentElement.clientHeight || window.innerHeight
+  scaleEnabled.value = isScreenScaleEnabled()
+
+  // 视口两个方向都够大写 → 保持 1:1（高度方向拉伸填充，像素级不缩放）；
+  // 任一方不足 → 整屏统一缩到刚好放下，绝不出现滚动条、也不裁内容。
+  const fitsNatively = viewportWidth >= DESIGN_WIDTH && viewportHeight >= DESIGN_HEIGHT
+  stretchToViewport.value = !scaleEnabled.value && fitsNatively
+  const nextScale = scaleEnabled.value
+    ? Math.min(viewportWidth / DESIGN_WIDTH, viewportHeight / DESIGN_HEIGHT)
+    : fitsNatively
+      ? 1
+      : Math.min(viewportWidth / DESIGN_WIDTH, viewportHeight / DESIGN_HEIGHT)
 
   screenScale.value = nextScale
   // body 级浮层（下拉 / tooltip / 弹窗 / 全局消息）不参与画布缩放，
   // 把当前缩放比例写进 CSS 变量，让 global.css 里的浮层规则按同一比例归一。
   document.documentElement.style.setProperty('--screen-scale', String(nextScale))
+  // 居中：剩余空间一分为二（缩小态两侧/上下留白，拉伸态横向居中）
   stageLeft.value = Math.max(0, (viewportWidth - DESIGN_WIDTH * nextScale) / 2)
-  stageTop.value = Math.max(0, (viewportHeight - DESIGN_HEIGHT * nextScale) / 2)
+  stageTop.value = stretchToViewport.value
+    ? 0
+    : Math.max(0, (viewportHeight - DESIGN_HEIGHT * nextScale) / 2)
   notifyResize()
 }
 
@@ -294,6 +330,11 @@ onBeforeUnmount(() => {
 
 .screen-stage {
   position: absolute;
+}
+
+/* 1:1 不缩放模式下，画布可能大于视口：允许滚动平移查看（缩放模式仍严格撑满不滚动） */
+.screen-shell.is-unscaled {
+  overflow: auto;
 }
 
 .screen-wrapper {
@@ -495,5 +536,29 @@ onBeforeUnmount(() => {
   flex: 0 0 var(--w-data) !important;
   height: 100%;
   min-height: 0 !important;
+}
+
+/* ===== 紧凑档：可视区高度低于设计稿 1152 时启用 =====
+ * 不缩放模式已把画布高度交给视口，若原样保留设计稿的垂直留白，
+ * 用户情况（覆盖率块）与右下面板会被裁 5~10px。这里按比例收紧
+ * 标题栏、上下内边距、列间距和两个内容最小高度，保证内容完整且无滚动条。 */
+.screen-shell.is-compact .screen-wrapper {
+  --header-height: 64px;
+  --dashboard-pad-y: 10px;
+  --dashboard-gap: 14px;
+  --left-level-ring-min-height: 100px;
+  --left-coverage-col-min-height: 76px;
+}
+
+.screen-shell.is-compact .right-bottom {
+  gap: 6px !important;
+  padding-bottom: 4px !important;
+}
+
+/* 兜底：屏幕更矮（<1040）时内容实在放不下，让这两块自身滚动，
+   而不是把文字裁掉。内容放得下时不会出现滚动条。 */
+.screen-shell.is-compact .left-top,
+.screen-shell.is-compact .right-bottom {
+  overflow-y: auto !important;
 }
 </style>

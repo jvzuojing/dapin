@@ -234,6 +234,26 @@ export const fillRateData = {
   village: 65
 }
 
+/** 自治区地图·盟市数据质量（全区视图地图上的四率展示）
+ *  数据来源：业务方提供的盟市汇总表（2026-11）；接口就绪后由 API 层替换本文件
+ *  注意：二连浩特市/满洲里市为旗县级市，无对应盟市地图区域，地图上暂不展示 */
+export const regionQualityData = [
+  { name: '呼和浩特市', villageTotal: 1415, villageActive: 1415, accountRate: 100, popHouseRate: 100, entRate: 100, linkRate: 92.08 },
+  { name: '包头市', villageTotal: 826, villageActive: 826, accountRate: 100, popHouseRate: 100, entRate: 100, linkRate: 93.54 },
+  { name: '乌海市', villageTotal: 83, villageActive: 83, accountRate: 100, popHouseRate: 100, entRate: 100, linkRate: 99.49 },
+  { name: '赤峰市', villageTotal: 2436, villageActive: 2436, accountRate: 100, popHouseRate: 100, entRate: 100, linkRate: 99.98 },
+  { name: '通辽市', villageTotal: 2483, villageActive: 2483, accountRate: 100, popHouseRate: 100, entRate: 100, linkRate: 99.99 },
+  { name: '鄂尔多斯市', villageTotal: 1023, villageActive: 1023, accountRate: 100, popHouseRate: 97.26, entRate: 61.34, linkRate: 86.04 },
+  { name: '呼伦贝尔市', villageTotal: 1153, villageActive: 1153, accountRate: 100, popHouseRate: 100, entRate: 100, linkRate: 99.64 },
+  { name: '巴彦淖尔市', villageTotal: 803, villageActive: 803, accountRate: 100, popHouseRate: 100, entRate: 98.19, linkRate: 67.28 },
+  { name: '乌兰察布市', villageTotal: 1504, villageActive: 1504, accountRate: 100, popHouseRate: 99.93, entRate: 98.27, linkRate: 99.76 },
+  { name: '兴安盟', villageTotal: 1026, villageActive: 1026, accountRate: 100, popHouseRate: 99.76, entRate: 85.09, linkRate: 97.82 },
+  { name: '锡林郭勒盟', villageTotal: 1036, villageActive: 1036, accountRate: 100, popHouseRate: 100, entRate: 99.81, linkRate: 98.81 },
+  { name: '阿拉善盟', villageTotal: 255, villageActive: 255, accountRate: 100, popHouseRate: 85.88, entRate: 54.12, linkRate: 66.57 },
+  { name: '二连浩特市', villageTotal: 13, villageActive: 13, accountRate: 100, popHouseRate: 100, entRate: 15.38, linkRate: 93.01 },
+  { name: '满洲里市', villageTotal: 21, villageActive: 21, accountRate: 100, popHouseRate: 100, entRate: 100, linkRate: 99.91 }
+]
+
 // 人房企场所 数据
 export const entityData = {
   ren: {

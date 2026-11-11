@@ -422,11 +422,6 @@ body {
   box-shadow: 0 4px 18px rgba(0, 20, 60, 0.45);
 }
 
-.cell-full-tip.el-popper.is-dark .el-popper__arrow::before {
-  background: rgba(10, 26, 58, 0.96);
-  border-color: rgba(90, 150, 230, 0.5);
-}
-
 /* 下拉弹层深色主题（正式环境反馈：select 默认白底与深色大屏不搭、圆角箭头突兀）：
    统一冷蓝配色，与 tooltip 同一套视觉 */
 .el-select__popper.el-popper,
@@ -434,12 +429,6 @@ body {
   background: rgba(10, 26, 58, 0.96) !important;
   border: 1px solid rgba(90, 150, 230, 0.5) !important;
   border-radius: calc(4px * var(--screen-scale)) !important;
-}
-
-.el-select__popper .el-popper__arrow::before,
-.el-cascader__popper .el-popper__arrow::before {
-  background: rgba(10, 26, 58, 0.96);
-  border: 1px solid rgba(90, 150, 230, 0.5);
 }
 
 .el-select-dropdown,
@@ -464,10 +453,10 @@ body {
 
 /* 弹层箭头与圆角按大屏缩放归一：页面在 .screen-wrapper 里被整体缩小后，
    固定像素的箭头/圆角相对页面会显得巨大（正式环境 Windows 下尤其明显） */
-.el-popper__arrow,
-.el-popper__arrow::before {
-  width: calc(14px * var(--screen-scale));
-  height: calc(14px * var(--screen-scale));
+/* 弹层箭头彻底隐藏：Element Plus 的 .is-light 箭头样式优先级更高，
+   深色覆盖压不住，正式环境会出现白色菱形箭头，直接去掉最干净 */
+.el-popper__arrow {
+  display: none !important;
 }
 
 .el-popper {

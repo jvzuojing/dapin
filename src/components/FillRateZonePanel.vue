@@ -16,6 +16,7 @@
       <FillRateMap
         :data="coverageCityData"
         :county-data="coverageCountyData"
+        :quality-data="regionQualityData"
         :scale-version="scaleVersion"
         :selected-code="cityCode"
         :selected-county-code="countyCode"
@@ -34,6 +35,8 @@ import { computed, inject, ref, type Ref } from 'vue'
 import FillRateMap, { type FillRateItem } from './FillRateMap.vue'
 import { useScaledData, useRegionData } from '../composables/useRegionData'
 import { useDashboardApi } from '../composables/useDashboardApi'
+// 自治区地图四率数据：暂用业务方提供的表（mock），接口就绪后替换为 API 取数
+import { regionQualityData } from '../mock/data'
 
 const { fillRateData } = useScaledData()
 const { scaleVersion } = useRegionData()
