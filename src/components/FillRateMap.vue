@@ -303,6 +303,10 @@ const stopsColor = (stops: string[], t: number) => {
 const RATE_STOPS = ['#13375f', '#155f96', '#1689bd', '#1bb5d8', '#57e6ff']
 const colorOf = (t: number) => stopsColor(RATE_STOPS, t)
 
+/** 四率模式下地图面的统一底色：恢复参考稿的中蓝色（加四率条之前的老地图色）。
+ *  悬停高亮仍走 emphasis 的亮青色，不变 */
+const QUALITY_REGION_COLOR = '#2b7ecf'
+
 /** 无指标数据时所有面统一用色阶中段的基准色：不再散列着色，也不伪装数值高低；
  *  相邻块靠细边框、3D 侧面明暗和悬停高亮区分 */
 const BASE_COLOR = colorOf(0.5)
@@ -499,7 +503,7 @@ const buildOption = () => {
       return {
         name,
         height: 1.4,
-        itemStyle: { color: colorOf(0.72), opacity: 0.98 }
+        itemStyle: { color: QUALITY_REGION_COLOR, opacity: 0.98 }
       }
     }
     const hit = rateByName.get(name)
@@ -711,7 +715,7 @@ const buildOption2D = () => {
 
   /** 每个面的配色：四率模式统一青色底，其余按填报率色阶 */
   const colorOfName = (name: string) => {
-    if (quality) return colorOf(0.72)
+    if (quality) return QUALITY_REGION_COLOR
     const hit = rateByName.get(name)
     return hit ? colorOf(norm(Number(hit.value))) : BASE_COLOR
   }
